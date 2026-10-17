@@ -103,7 +103,7 @@ func (d decoder) project(directives []*Directive) (*Project, error) {
 	header := directives[0]
 	kind, err := quanarch.ParseKind(header.Name)
 	if err != nil {
-		return nil, d.errorf(header.Line, "the first line must declare the project as quanar, quan, qua or qmock, found %q", header.Name)
+		return nil, d.errorf(header.Line, "the first line must declare the project as project, quanar, quan, qua or qmock, found %q", header.Name)
 	}
 	if err := d.noBlock(header); err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (d decoder) project(directives []*Directive) (*Project, error) {
 			zones[zone.Name] = true
 			p.Zones = append(p.Zones, zone)
 
-		case "quan", "quanar", "qmock":
+		case "project", "quan", "quanar", "qmock":
 			return nil, d.errorf(dir.Line, "the project is already declared as %s %s on line %d", kind, p.Name, header.Line)
 
 		default:
