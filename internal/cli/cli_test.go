@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -58,5 +60,29 @@ func TestNewListsKinds(t *testing.T) {
 		if !strings.Contains(out, "  "+kind+" ") {
 			t.Errorf("help does not list %q:\n%s", kind, out)
 		}
+	}
+}
+
+func TestCheck(t *testing.T) {
+	dir := t.TempDir()
+	src := "quan billing\nqua qua-a@1\nzone admin {\n\tqua qua-b@2\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "conf.qu"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := execute(t, "qu", "check", dir)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, errOut)
+	}
+	for _, want := range []string{"quan billing", "qua    qua-a@1", "zone   admin", "qua qua-b@2"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestCheckMissingFile(t *testing.T) {
+	code, _, errOut := execute(t, "qu", "check", t.TempDir())
+	if code != 1 || !strings.Contains(errOut, "no conf.qu found") {
+		t.Fatalf("code=%d stderr=%q", code, errOut)
 	}
 }

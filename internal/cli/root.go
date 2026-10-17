@@ -49,6 +49,7 @@ func newRootCmd(name string) *cobra.Command {
 
 	root.AddCommand(
 		newNewCmd(),
+		newCheckCmd(),
 		newVersionCmd(),
 	)
 	return root
