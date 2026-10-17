@@ -30,13 +30,16 @@ This repository contains `quanarch`, the command-line tool (`qu` for short).
 ## Usage
 
 ```sh
-qu new quan billing --stack react-ts      # create a quan
-qu new quanar main --stack react-ts       # create a quanar
-qu new qua qua-a --stack react-ts         # create a qua
+qu new qua qua-a --stack react-ts                     # a contract
+qu new quanar main --stack react-ts --qua ./qua-a     # a quanar that plugs it in
+qu new quan billing --stack react-ts --qua ./qua-a    # a quan that uses it
 
-qu check                                  # validate conf.qu in the current project
+qu check                                              # validate conf.qu in the current project
 qu version
 ```
+
+`--qua` takes a qua on disk, read through its `conf.qu`, or a published one as
+`name[@version]`. It can be repeated.
 
 `--stack` accepts an official stack, a git repository or a local directory:
 
