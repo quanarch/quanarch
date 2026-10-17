@@ -16,10 +16,11 @@ var (
 	colorOK     = lipgloss.AdaptiveColor{Light: "#1E8E5A", Dark: "#4ADE80"}
 
 	kindColors = map[quanarch.Kind]lipgloss.AdaptiveColor{
-		quanarch.Quanar: {Light: "#B7791F", Dark: "#F2B84B"},
-		quanarch.Quan:   {Light: "#7C3AED", Dark: "#B794F6"},
-		quanarch.Qua:    {Light: "#0F8A7E", Dark: "#4FD1C5"},
-		quanarch.Qmock:  {Light: "#C2417F", Dark: "#F687B3"},
+		quanarch.Project: {Light: "#2563EB", Dark: "#7AA2F7"},
+		quanarch.Quanar:  {Light: "#B7791F", Dark: "#F2B84B"},
+		quanarch.Quan:    {Light: "#7C3AED", Dark: "#B794F6"},
+		quanarch.Qua:     {Light: "#0F8A7E", Dark: "#4FD1C5"},
+		quanarch.Qmock:   {Light: "#C2417F", Dark: "#F687B3"},
 	}
 
 	styleBrand  = lipgloss.NewStyle().Bold(true).Padding(0, 1).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color("#1D1B26"))
@@ -35,7 +36,8 @@ func kindStyle(k quanarch.Kind) lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(kindColors[k]).Bold(true)
 }
 
-func question(s step) string {
+func (m Model) question(s step) string {
+	project := m.answers.Kind == quanarch.Project
 	switch s {
 	case stepKind:
 		return "What do you want to create?"
@@ -44,7 +46,16 @@ func question(s step) string {
 	case stepDir:
 		return "Where should it go?"
 	case stepName:
+		if project {
+			return "Project name?"
+		}
 		return "What is its name?"
+	case stepQuaName:
+		return "Qua name?"
+	case stepQuanarName:
+		return "Quanar name?"
+	case stepQuanName:
+		return "Quan name?"
 	case stepConfirm:
 		return "Create it?"
 	}
@@ -62,6 +73,12 @@ func (m Model) answer(s step) string {
 		return styleAccent.Render(m.answers.Dir)
 	case stepName:
 		return styleAccent.Render(m.answers.Name)
+	case stepQuaName:
+		return kindStyle(quanarch.Qua).Render(m.answers.Qua)
+	case stepQuanarName:
+		return kindStyle(quanarch.Quanar).Render(m.answers.Quanar)
+	case stepQuanName:
+		return kindStyle(quanarch.Quan).Render(m.answers.Quan)
 	}
 	return ""
 }
@@ -73,14 +90,14 @@ func (m Model) View() string {
 	b.WriteString("\n " + styleBrand.Render("quanarch") + " " + styleDim.Render(m.version) + "\n\n")
 
 	if m.answers.Kind != "" && !m.has(stepKind) {
-		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(question(stepKind)), m.answer(stepKind))
+		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(m.question(stepKind)), m.answer(stepKind))
 	}
 	if m.answers.Name != "" && !m.has(stepName) {
-		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(question(stepName)), m.answer(stepName))
+		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(m.question(stepName)), m.answer(stepName))
 	}
 	for i := 0; i < m.at; i++ {
 		s := m.steps[i]
-		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(question(s)), m.answer(s))
+		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(m.question(s)), m.answer(s))
 	}
 
 	if m.cancelled {
@@ -88,14 +105,12 @@ func (m Model) View() string {
 		return b.String()
 	}
 	if m.done {
-		b.WriteString(m.summary())
-		b.WriteString("\n " + styleOK.Render("✔") + " " + styleBold.Render("Ready to create "+string(m.answers.Kind)+" "+m.answers.Name) + "\n")
-		b.WriteString("   " + styleDim.Render("Preview only: nothing was written to disk.") + "\n\n")
+		b.WriteString(m.summary() + "\n")
 		return b.String()
 	}
 
 	s := m.current()
-	fmt.Fprintf(&b, " %s %s\n", styleAccent.Render("?"), styleBold.Render(question(s)))
+	fmt.Fprintf(&b, " %s %s\n", styleAccent.Render("?"), styleBold.Render(m.question(s)))
 	b.WriteString(m.body(s))
 
 	if m.err != "" {
@@ -160,9 +175,9 @@ func (m Model) body(s step) string {
 			b.WriteString("   " + styleDim.Render(dir) + "\n")
 		}
 
-	case stepName:
-		b.WriteString("   " + styleAccent.Render("› ") + m.nameInput.View() + "\n")
-		b.WriteString("   " + styleDim.Render("lowercase letters, digits and dashes") + "\n")
+	case stepName, stepQuaName, stepQuanarName, stepQuanName:
+		b.WriteString("   " + styleAccent.Render("› ") + m.names[s].View() + "\n")
+		b.WriteString("   " + styleDim.Render(m.nameHint(s)) + "\n")
 
 	case stepConfirm:
 		b.WriteString(m.summary())
@@ -179,13 +194,35 @@ func (m Model) body(s step) string {
 	return b.String()
 }
 
-func (m Model) summary() string {
-	rows := []string{
-		styleDim.Render("Kind      ") + kindStyle(m.answers.Kind).Render(string(m.answers.Kind)),
-		styleDim.Render("Name      ") + styleBold.Render(m.answers.Name),
-		styleDim.Render("Language  ") + m.answers.Language.Name,
-		styleDim.Render("Location  ") + m.answers.Target(),
+func (m Model) nameHint(s step) string {
+	switch s {
+	case stepQuaName:
+		return "the contract, created in packages/"
+	case stepQuanarName:
+		return "the host, created in quanar/"
+	case stepQuanName:
+		return "the first quan, created in quans/"
 	}
+	return "lowercase letters, digits and dashes"
+}
+
+func (m Model) summary() string {
+	label := func(s string) string { return styleDim.Render(fmt.Sprintf("%-10s", s)) }
+	rows := []string{
+		label("Kind") + kindStyle(m.answers.Kind).Render(string(m.answers.Kind)),
+		label("Name") + styleBold.Render(m.answers.Name),
+	}
+	if m.answers.Kind == quanarch.Project {
+		rows = append(rows,
+			label("Qua")+kindStyle(quanarch.Qua).Render(m.answers.Qua)+styleDim.Render("     packages/"+m.answers.Qua),
+			label("Quanar")+kindStyle(quanarch.Quanar).Render(m.answers.Quanar)+styleDim.Render("  quanar/"),
+			label("Quan")+kindStyle(quanarch.Quan).Render(m.answers.Quan)+styleDim.Render("    quans/"+m.answers.Quan),
+		)
+	}
+	rows = append(rows,
+		label("Language")+m.answers.Language.Name,
+		label("Location")+m.answers.Target(),
+	)
 	return "\n" + styleBox.Render(strings.Join(rows, "\n")) + "\n"
 }
 

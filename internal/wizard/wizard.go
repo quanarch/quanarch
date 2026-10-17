@@ -52,6 +52,10 @@ type Answers struct {
 	// Dir is the absolute directory the project is created in.
 	Dir  string
 	Name string
+	// For a project: the names of its qua, quanar and quan.
+	Qua    string
+	Quanar string
+	Quan   string
 }
 
 // Target is the absolute path of the project to create.
@@ -66,6 +70,9 @@ const (
 	stepLanguage
 	stepDir
 	stepName
+	stepQuaName
+	stepQuanarName
+	stepQuanName
 	stepConfirm
 )
 
@@ -78,44 +85,60 @@ type Model struct {
 	kindCursor int
 	langCursor int
 	dirInput   textinput.Model
-	nameInput  textinput.Model
+	names      map[step]*textinput.Model
 	confirmYes bool
 	err        string
 
-	cwd       string
-	version   string
-	done      bool
-	cancelled bool
+	cwd        string
+	version    string
+	presetKind bool
+	presetName bool
+	done       bool
+	cancelled  bool
 }
 
 // New returns a wizard that asks for everything preset leaves out.
 func New(preset Preset, cwd, version string) Model {
-	m := Model{cwd: cwd, version: version, confirmYes: true}
-
-	if preset.Kind == "" {
-		m.steps = append(m.steps, stepKind)
-	} else {
-		m.answers.Kind = preset.Kind
-	}
-	m.steps = append(m.steps, stepLanguage, stepDir)
-	if preset.Name == "" {
-		m.steps = append(m.steps, stepName)
-	} else {
-		m.answers.Name = preset.Name
-	}
-	m.steps = append(m.steps, stepConfirm)
+	m := Model{cwd: cwd, version: version, confirmYes: true, names: map[step]*textinput.Model{}}
+	m.answers.Kind = preset.Kind
+	m.answers.Name = preset.Name
+	m.presetKind = preset.Kind != ""
+	m.presetName = preset.Name != ""
 
 	m.dirInput = textinput.New()
 	m.dirInput.Placeholder = "."
 	m.dirInput.Prompt = ""
 	m.dirInput.CharLimit = 4096
 
-	m.nameInput = textinput.New()
-	m.nameInput.Placeholder = "billing-report"
-	m.nameInput.Prompt = ""
-	m.nameInput.CharLimit = 64
+	for _, s := range []step{stepName, stepQuaName, stepQuanarName, stepQuanName} {
+		in := textinput.New()
+		in.Prompt = ""
+		in.CharLimit = 64
+		m.names[s] = &in
+	}
+	m.names[stepName].Placeholder = "billing-report"
+	m.names[stepQuaName].Placeholder = "acme-qua"
+	m.names[stepQuanarName].Placeholder = "acme-quanar"
+	m.names[stepQuanName].Placeholder = "billing"
 
+	m.steps = m.buildSteps()
 	return m
+}
+
+// buildSteps lists the steps for the chosen kind; a project asks for more names.
+func (m Model) buildSteps() []step {
+	var steps []step
+	if !m.presetKind {
+		steps = append(steps, stepKind)
+	}
+	steps = append(steps, stepLanguage, stepDir)
+	if !m.presetName {
+		steps = append(steps, stepName)
+	}
+	if m.answers.Kind == quanarch.Project {
+		steps = append(steps, stepQuaName, stepQuanarName, stepQuanName)
+	}
+	return append(steps, stepConfirm)
 }
 
 // Done reports whether the user confirmed; Answers is then complete.
@@ -151,7 +174,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateLanguage(key)
 	case stepDir:
 		return m.updateDir(key)
-	case stepName:
+	case stepName, stepQuaName, stepQuanarName, stepQuanName:
 		return m.updateName(key)
 	case stepConfirm:
 		return m.updateConfirm(key)
@@ -178,23 +201,24 @@ func (m Model) next() (tea.Model, tea.Cmd) {
 // focus gives keyboard focus to the text input of the current step, if any.
 func (m *Model) focus() tea.Cmd {
 	m.dirInput.Blur()
-	m.nameInput.Blur()
-	switch m.current() {
-	case stepDir:
+	for _, in := range m.names {
+		in.Blur()
+	}
+	if m.current() == stepDir {
 		return m.dirInput.Focus()
-	case stepName:
-		return m.nameInput.Focus()
+	}
+	if in, ok := m.names[m.current()]; ok {
+		return in.Focus()
 	}
 	return nil
 }
 
 func (m Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	switch m.current() {
-	case stepDir:
+	if m.current() == stepDir {
 		m.dirInput, cmd = m.dirInput.Update(msg)
-	case stepName:
-		m.nameInput, cmd = m.nameInput.Update(msg)
+	} else if in, ok := m.names[m.current()]; ok {
+		*in, cmd = in.Update(msg)
 	}
 	return m, cmd
 }
@@ -212,6 +236,7 @@ func moveCursor(cursor, n int, key string) int {
 func (m Model) updateKind(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.String() == "enter" {
 		m.answers.Kind = quanarch.Kinds[m.kindCursor]
+		m.steps = m.buildSteps()
 		return m.next()
 	}
 	m.kindCursor = moveCursor(m.kindCursor, len(quanarch.Kinds), key.String())
@@ -260,22 +285,46 @@ func (m Model) updateName(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		nm.err = nm.nameError()
 		return nm, cmd
 	}
-	name := strings.TrimSpace(m.nameInput.Value())
+	name := strings.TrimSpace(m.names[m.current()].Value())
 	if err := quanarch.ValidateName(name); err != nil {
 		m.err = err.Error()
 		return m, nil
 	}
-	if err := checkTarget(filepath.Join(m.answers.Dir, name)); err != nil {
+	if err := m.checkUnique(m.current(), name); err != nil {
 		m.err = err.Error()
 		return m, nil
 	}
-	m.answers.Name = name
+	switch m.current() {
+	case stepName:
+		if err := checkTarget(filepath.Join(m.answers.Dir, name)); err != nil {
+			m.err = err.Error()
+			return m, nil
+		}
+		m.answers.Name = name
+	case stepQuaName:
+		m.answers.Qua = name
+	case stepQuanarName:
+		m.answers.Quanar = name
+	case stepQuanName:
+		m.answers.Quan = name
+	}
 	return m.next()
+}
+
+// checkUnique keeps the qua, quanar and quan of a project apart: each becomes a package.
+func (m Model) checkUnique(s step, name string) error {
+	taken := map[step]string{stepQuaName: m.answers.Qua, stepQuanarName: m.answers.Quanar, stepQuanName: m.answers.Quan}
+	for other, used := range taken {
+		if other != s && used == name && s != stepName {
+			return fmt.Errorf("%q is already used in this project", name)
+		}
+	}
+	return nil
 }
 
 // nameError validates the name as it is typed; an empty field is not an error yet.
 func (m Model) nameError() string {
-	name := m.nameInput.Value()
+	name := m.names[m.current()].Value()
 	if name == "" {
 		return ""
 	}

@@ -28,6 +28,8 @@ func press(t *testing.T, m Model, keys ...string) Model {
 			msg = tea.KeyMsg{Type: tea.KeyLeft}
 		case "ctrl+c":
 			msg = tea.KeyMsg{Type: tea.KeyCtrlC}
+		case "ctrl+u":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlU}
 		default:
 			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
 		}
@@ -41,7 +43,7 @@ func TestFullFlow(t *testing.T) {
 	cwd := t.TempDir()
 	m := New(Preset{}, cwd, "v0.0.0")
 
-	m = press(t, m, "down", "enter") // quan
+	m = press(t, m, "down", "down", "enter") // quan
 	if m.answers.Kind != quanarch.Quan || m.current() != stepLanguage {
 		t.Fatalf("after kind: %+v at %d", m.answers, m.current())
 	}
@@ -81,7 +83,7 @@ func TestPresetSkipsSteps(t *testing.T) {
 
 func TestEscGoesBackAndCancelsAtStart(t *testing.T) {
 	m := New(Preset{}, t.TempDir(), "v0")
-	m = press(t, m, "enter") // quanar
+	m = press(t, m, "down", "enter") // quanar
 	if m.current() != stepLanguage {
 		t.Fatal("did not advance")
 	}
@@ -139,5 +141,38 @@ func TestDeclining(t *testing.T) {
 	}
 	if !strings.Contains(m.View(), "Nothing was created") {
 		t.Errorf("view:\n%s", m.View())
+	}
+}
+
+func TestProjectAsksForEveryName(t *testing.T) {
+	cwd := t.TempDir()
+	m := New(Preset{}, cwd, "v0")
+	m = press(t, m, "enter") // project
+	if m.answers.Kind != quanarch.Project {
+		t.Fatalf("kind = %s", m.answers.Kind)
+	}
+	m = press(t, m, "enter", "enter")    // language, current folder
+	m = press(t, m, "acme", "enter")     // project
+	m = press(t, m, "acme-qua", "enter") // qua
+	m = press(t, m, "acme-qua", "enter") // quanar: same name is refused
+	if m.current() != stepQuanarName || !strings.Contains(m.err, "already used") {
+		t.Fatalf("at %d err=%q", m.current(), m.err)
+	}
+	m = press(t, m, "esc", "enter")                   // back to qua, keep it
+	m = press(t, m, "ctrl+u", "acme-quanar", "enter") // clear the refused name first
+	m = press(t, m, "billing", "enter")
+	if m.current() != stepConfirm {
+		t.Fatalf("at %d err=%q", m.current(), m.err)
+	}
+	view := m.View()
+	for _, want := range []string{"packages/acme-qua", "quanar/", "quans/billing", filepath.Join(cwd, "acme")} {
+		if !strings.Contains(view, want) {
+			t.Errorf("summary misses %q:\n%s", want, view)
+		}
+	}
+	m = press(t, m, "enter")
+	want := Answers{Kind: quanarch.Project, Language: Languages[0], Dir: cwd, Name: "acme", Qua: "acme-qua", Quanar: "acme-quanar", Quan: "billing"}
+	if !m.Done() || m.Answers() != want {
+		t.Errorf("answers = %+v", m.Answers())
 	}
 }
