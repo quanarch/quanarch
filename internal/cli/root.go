@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/quanarch/quanarch/internal/version"
+	"github.com/quanarch/quanarch/internal/wizard"
 )
 
 // Execute runs the CLI with the process arguments and returns the exit code.
@@ -38,11 +39,19 @@ func init() {
 func newRootCmd(name string) *cobra.Command {
 	root := &cobra.Command{
 		Use:           name,
-		Short:         "Create and manage Quanarch quans, quanars and quas",
+		Short:         "Create quanars, quans, quas and qmocks",
 		Long:          "Quanarch is an architecture style built on three concepts: quan, quanar and qua.\nLearn more at https://quanarch.org",
 		Version:       version.String(),
+		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// Bare `qu` opens the interactive wizard.
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !wizard.IsInteractive() {
+				return cmd.Help()
+			}
+			return runWizard(cmd, wizard.Preset{})
+		},
 	}
 	root.SetVersionTemplate("{{.Name}} {{.Version}}\n")
 	root.CompletionOptions.HiddenDefaultCmd = true
