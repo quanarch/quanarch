@@ -1,4 +1,13 @@
-# Quanarch
+<p align="center">
+  <img src=".github/assets/logo.png" alt="Quanarch" width="120">
+</p>
+
+<h1 align="center">Quanarch</h1>
+
+<p align="center">
+  An architecture style between the monolith and microservices.<br>
+  <a href="https://quanarch.org">quanarch.org</a>
+</p>
 
 Quanarch is an architecture style that sits between the monolith and microservices.
 A system is built from three concepts:
