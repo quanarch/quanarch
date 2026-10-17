@@ -27,10 +27,23 @@ const TemplateSuffix = ".qtpl"
 // Data is available to templates as the dot value.
 type Data struct {
 	Name         string // kebab-case project name, for example "billing-report"
-	Kind         string // quan, quanar or qua
+	Kind         string // project, quanar, quan, qua or qmock
 	Stack        string
 	StackVersion string
 	Quas         []Qua // quas a quan uses or a quanar plugs in
+	// Project is the name of the project the new code belongs to, if any.
+	Project string
+	// Quans lists the quans a quanar loads.
+	Quans []Quan
+	// Port is the port a quan is served on while it is developed.
+	Port int
+}
+
+// Quan is a quan a quanar loads.
+type Quan struct {
+	Name string
+	// Port is the port the quan is served on while it is developed.
+	Port int
 }
 
 // Qua is a qua referenced by the new project.
