@@ -51,14 +51,15 @@ func ParseRef(s string) (Ref, error) {
 		return Ref{}, err
 	}
 	if pinned {
-		if err := validateVersion(version); err != nil {
+		if err := ValidateVersion(version); err != nil {
 			return Ref{}, err
 		}
 	}
 	return Ref{Name: name, Version: version}, nil
 }
 
-func validateVersion(v string) error {
+// ValidateVersion reports whether v is a version such as 1, 1.2, 1.2.3 or 2.0.0-beta.1.
+func ValidateVersion(v string) error {
 	if !versionPattern.MatchString(v) {
 		return fmt.Errorf("invalid version %q (expected a form like 1, 1.2 or 1.2.3)", v)
 	}
@@ -133,7 +134,7 @@ func (d decoder) project(directives []*Directive) (*Project, error) {
 				return nil, err
 			}
 			if dir.Name == "version" {
-				if err := validateVersion(dir.Args[0]); err != nil {
+				if err := ValidateVersion(dir.Args[0]); err != nil {
 					return nil, d.errorf(dir.Line, "%v", err)
 				}
 				p.Version = dir.Args[0]
