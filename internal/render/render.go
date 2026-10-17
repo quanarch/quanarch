@@ -30,6 +30,16 @@ type Data struct {
 	Kind         string // quan, quanar or qua
 	Stack        string
 	StackVersion string
+	Quas         []Qua // quas a quan uses or a quanar plugs in
+}
+
+// Qua is a qua referenced by the new project.
+type Qua struct {
+	Name    string // for example "qua-a"
+	Version string // may be empty
+	// Path is the slash-separated path from the new project to a qua on disk,
+	// for example "../qua-a". Empty when the qua comes from a registry.
+	Path string
 }
 
 // Funcs are the helper functions available to templates.

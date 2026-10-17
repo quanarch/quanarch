@@ -43,7 +43,7 @@ func ParseSpec(s string) (Spec, error) {
 	case s == "":
 		return Spec{}, fmt.Errorf("stack is empty")
 
-	case isLocalPath(s):
+	case IsLocalPath(s):
 		abs, err := filepath.Abs(s)
 		if err != nil {
 			return Spec{}, err
@@ -84,7 +84,8 @@ func Official() []string {
 	return names
 }
 
-func isLocalPath(s string) bool {
+// IsLocalPath reports whether s names something on disk rather than a registry name or URL.
+func IsLocalPath(s string) bool {
 	return s == "." || s == ".." ||
 		strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../") ||
 		strings.HasPrefix(s, `.\`) || strings.HasPrefix(s, `..\`) ||
