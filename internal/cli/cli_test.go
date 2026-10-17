@@ -78,6 +78,45 @@ func TestNewFromLocalStack(t *testing.T) {
 	}
 }
 
+func TestNewWithQuas(t *testing.T) {
+	stackDir := writeStack(t, "")
+	writeFile(t, stackDir, "templates/quan/quas.txt.qtpl", "[[ range .Quas ]][[ .Name ]]|[[ .Version ]]|[[ .Path ]]\n[[ end ]]")
+	root := t.TempDir()
+	writeFile(t, root, "qua-a/conf.qu", "qua qua-a\nversion 2\n")
+	writeFile(t, root, "main/conf.qu", "quanar main\n")
+
+	run := func(args ...string) (int, string) {
+		code, _, errOut := execute(t, "qu", append([]string{"new", "quan", "billing", "--stack", stackDir}, args...)...)
+		return code, errOut
+	}
+
+	dst := filepath.Join(root, "quans", "billing")
+	if code, errOut := run("--dir", dst, "--qua", filepath.Join(root, "qua-a"), "--qua", "qua-b@1"); code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, errOut)
+	}
+	got, err := os.ReadFile(filepath.Join(dst, "quas.txt"))
+	if err != nil || string(got) != "qua-a|2|../../qua-a\nqua-b|1|\n" {
+		t.Errorf("quas.txt = %q, %v", got, err)
+	}
+
+	cases := map[string][]string{
+		"is a quanar, not a qua":  {"--qua", filepath.Join(root, "main")},
+		"no conf.qu found":        {"--qua", filepath.Join(root, "missing")},
+		"is given more than once": {"--qua", "qua-b@1", "--qua", "qua-b@1"},
+		"must be lowercase":       {"--qua", "Qua"},
+	}
+	for want, args := range cases {
+		code, errOut := run(append([]string{"--dir", filepath.Join(t.TempDir(), "x")}, args...)...)
+		if code != 1 || !strings.Contains(errOut, want) {
+			t.Errorf("%v: code=%d stderr=%q, want %q", args, code, errOut, want)
+		}
+	}
+
+	if code, _, errOut := execute(t, "qu", "new", "qua", "x", "--qua", "y"); code != 1 || !strings.Contains(errOut, "unknown flag: --qua") {
+		t.Errorf("qua accepted --qua: code=%d stderr=%q", code, errOut)
+	}
+}
+
 func TestNewNoRun(t *testing.T) {
 	stackDir := writeStack(t, " {\n\trun does-not-exist\n}")
 	dst := filepath.Join(t.TempDir(), "x")

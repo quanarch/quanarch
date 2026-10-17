@@ -46,6 +46,7 @@ or Go needs no escaping. A `.git` directory is never copied.
 | `.Kind` | `quan` |
 | `.Stack` | `react-ts` |
 | `.StackVersion` | `1.0.0` |
+| `.Quas` | The quas given with `--qua`. Each has `.Name` (`qua-a`), `.Version` (`1`, may be empty) and `.Path` (`../qua-a` for a qua on disk, otherwise empty). |
 
 | Function | `billing-report` becomes |
 | --- | --- |
@@ -61,4 +62,7 @@ A template should include a `conf.qu.qtpl` so the new project can describe itsel
 ```
 [[ .Kind ]] [[ .Name ]]
 stack [[ .Stack ]]@[[ .StackVersion ]]
+[[ range .Quas ]]
+qua [[ .Name ]][[ if .Version ]]@[[ .Version ]][[ end ]]
+[[- end ]]
 ```

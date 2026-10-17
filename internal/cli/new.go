@@ -22,6 +22,7 @@ import (
 type newOptions struct {
 	stack string
 	dir   string
+	quas  []string
 	noRun bool
 }
 
@@ -55,6 +56,9 @@ func newKindCmd(kind quanarch.Kind) *cobra.Command {
 	cmd.Flags().StringVarP(&opts.stack, "stack", "s", "", "stack to create from: an official name such as react-ts[@1], a git repository or a local path")
 	cmd.Flags().StringVarP(&opts.dir, "dir", "d", "", "directory to create the project in (default ./<name>)")
 	cmd.Flags().BoolVar(&opts.noRun, "no-run", false, "do not run the stack's setup commands")
+	if kind != quanarch.Qua {
+		cmd.Flags().StringArrayVarP(&opts.quas, "qua", "q", nil, "qua to wire in, as name[@version] or a local path such as ../qua-a (repeatable)")
+	}
 	return cmd
 }
 
@@ -107,11 +111,15 @@ func runNew(cmd *cobra.Command, kind quanarch.Kind, name string, opts newOptions
 	if dst == "" {
 		dst = name
 	}
+	quas, err := resolveQuas(dst, opts.quas)
+	if err != nil {
+		return err
+	}
 	stackVersion := manifest.Version
 	if stackVersion == "" {
 		stackVersion = strings.TrimPrefix(fetched.Ref, "v")
 	}
-	data := render.Data{Name: name, Kind: string(kind), Stack: manifest.Name, StackVersion: stackVersion}
+	data := render.Data{Name: name, Kind: string(kind), Stack: manifest.Name, StackVersion: stackVersion, Quas: quas}
 	if err := render.Render(os.DirFS(filepath.Join(fetched.Dir, filepath.FromSlash(tmpl.Dir))), dst, data); err != nil {
 		return err
 	}
@@ -130,6 +138,63 @@ func runNew(cmd *cobra.Command, kind quanarch.Kind, name string, opts newOptions
 	}
 
 	return printCreated(out, kind, name, dst, manifest, stackVersion)
+}
+
+// resolveQuas turns --qua values into template data. A local path is read
+// through its conf.qu, so the qua's own name and version are used.
+func resolveQuas(dst string, values []string) ([]render.Qua, error) {
+	var quas []render.Qua
+	seen := map[string]bool{}
+	for _, v := range values {
+		var q render.Qua
+		if source.IsLocalPath(v) {
+			p, err := conf.Load(v)
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil, fmt.Errorf("--qua %s: no %s found", v, conf.FileName)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("--qua %s: %w", v, err)
+			}
+			if p.Kind != quanarch.Qua {
+				return nil, fmt.Errorf("--qua %s: %s is a %s, not a qua", v, p.Name, p.Kind)
+			}
+			rel, err := relPath(dst, v)
+			if err != nil {
+				return nil, err
+			}
+			q = render.Qua{Name: p.Name, Version: p.Version, Path: rel}
+		} else {
+			ref, err := conf.ParseRef(v)
+			if err != nil {
+				return nil, fmt.Errorf("--qua %s: %w", v, err)
+			}
+			q = render.Qua{Name: ref.Name, Version: ref.Version}
+		}
+		key := q.Name + "@" + q.Version
+		if seen[key] {
+			return nil, fmt.Errorf("--qua %s is given more than once", key)
+		}
+		seen[key] = true
+		quas = append(quas, q)
+	}
+	return quas, nil
+}
+
+// relPath returns the slash-separated path from directory from to target.
+func relPath(from, target string) (string, error) {
+	absFrom, err := filepath.Abs(from)
+	if err != nil {
+		return "", err
+	}
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(absFrom, absTarget)
+	if err != nil {
+		return "", err
+	}
+	return filepath.ToSlash(rel), nil
 }
 
 func runStep(cmd *cobra.Command, dir string, args []string) error {
