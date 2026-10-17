@@ -1,0 +1,52 @@
+version: 2
+
+project_name: quanarch
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - &build
+    id: quanarch
+    main: ./cmd/quanarch
+    binary: quanarch
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/quanarch/quanarch/internal/version.Version={{.Version}}
+      - -X github.com/quanarch/quanarch/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/quanarch/quanarch/internal/version.Date={{.Date}}
+  - <<: *build
+    id: qu
+    main: ./cmd/qu
+    binary: qu
+
+archives:
+  - ids: [quanarch, qu]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^Merge '
+      - '^docs:'
+      - '^chore:'
