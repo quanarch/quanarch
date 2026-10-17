@@ -37,24 +37,24 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func writeFile(t *testing.T, dir, rel, content string) {
+	t.Helper()
+	path := filepath.Join(dir, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // writeStack creates a local stack with a quan template and returns its path.
 func writeStack(t *testing.T, run string) string {
 	t.Helper()
 	dir := t.TempDir()
-	files := map[string]string{
-		"stack.qu":                    "stack demo\nversion 1.2.0\ntemplate quan templates/quan" + run + "\n",
-		"templates/quan/conf.qu.qtpl": "[[ .Kind ]] [[ .Name ]]\nstack [[ .Stack ]]@[[ .StackVersion ]]\n",
-		"templates/quan/src/[[ pascal .Name ]].ts": "export {};\n",
-	}
-	for rel, content := range files {
-		path := filepath.Join(dir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	writeFile(t, dir, "stack.qu", "stack demo\nversion 1.2.0\ntemplate quan templates/quan"+run+"\n")
+	writeFile(t, dir, "templates/quan/conf.qu.qtpl", "[[ .Kind ]] [[ .Name ]]\nstack [[ .Stack ]]@[[ .StackVersion ]]\n")
+	writeFile(t, dir, "templates/quan/src/[[ pascal .Name ]].ts", "export {};\n")
 	return dir
 }
 
