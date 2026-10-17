@@ -35,8 +35,11 @@ qu new quanar main           # create a quanar
 qu new qua qua-a             # create a qua
 
 qu new quan billing --stack react-ts
+qu check                     # validate conf.qu in the current project
 qu version
 ```
+
+Each project can describe itself in a [`conf.qu`](docs/conf-qu.md) file.
 
 The tool itself knows nothing about languages or frameworks. Templates come from
 **stacks**, separate repositories such as `quanarch-react`, so any language can
