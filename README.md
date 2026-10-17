@@ -30,20 +30,29 @@ This repository contains `quanarch`, the command-line tool (`qu` for short).
 ## Usage
 
 ```sh
-qu new quan billing          # create a quan
-qu new quanar main           # create a quanar
-qu new qua qua-a             # create a qua
+qu new quan billing --stack react-ts      # create a quan
+qu new quanar main --stack react-ts       # create a quanar
+qu new qua qua-a --stack react-ts         # create a qua
 
-qu new quan billing --stack react-ts
-qu check                     # validate conf.qu in the current project
+qu check                                  # validate conf.qu in the current project
 qu version
+```
+
+`--stack` accepts an official stack, a git repository or a local directory:
+
+```sh
+--stack react-ts                  # latest release
+--stack react-ts@1                # latest 1.x release
+--stack github.com/acme/stack@1.2 # any git repository
+--stack ./my-stack                # a stack on disk
 ```
 
 Each project can describe itself in a [`conf.qu`](docs/conf-qu.md) file.
 
 The tool itself knows nothing about languages or frameworks. Templates come from
 **stacks**, separate repositories such as `quanarch-react`, so any language can
-join the ecosystem.
+join the ecosystem. A stack is described by a [`stack.qu`](docs/stack-qu.md) file;
+releases are git tags, fetched once and cached. Git must be installed.
 
 ## Building from source
 
