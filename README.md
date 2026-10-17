@@ -30,27 +30,27 @@ This repository contains `quanarch`, the command-line tool (`qu` for short).
 ## Usage
 
 ```sh
-qu new qua qua-a --stack react-ts                     # a contract
-qu new quanar main --stack react-ts --qua ./qua-a     # a quanar that plugs it in
-qu new quan billing --stack react-ts --qua ./qua-a    # a quan that uses it
-
-qu check                                              # validate conf.qu in the current project
+qu                       # asks what to create, step by step
+qu new quan              # skips the questions you already answered
+qu new quan billing
+qu check                 # validate conf.qu in the current project
 qu version
 ```
 
-`--qua` takes a qua on disk, read through its `conf.qu`, or a published one as
-`name[@version]`. It can be repeated.
+`qu` asks for whatever is missing: what to create (project, quanar, quan, qua or
+qmock), the language, where to put it and its name. Arrow keys move, enter
+selects, esc goes back.
 
-`--stack` accepts an official stack, a git repository or a local directory:
+A **project** creates the three together, already wired:
 
-```sh
---stack react-ts                  # latest release
---stack react-ts@1                # latest 1.x release
---stack github.com/acme/stack@1.2 # any git repository
---stack ./my-stack                # a stack on disk
+```
+acme/
+├── packages/acme-qua/   the qua: the contract, linked by the others
+├── quanar/              the quanar: loads quans and plugs the qua in
+└── quans/billing/       a quan: business logic, loaded by the quanar
 ```
 
-Each project can describe itself in a [`conf.qu`](docs/conf-qu.md) file.
+Each project describes itself in a [`conf.qu`](docs/conf-qu.md) file.
 
 The tool itself knows nothing about languages or frameworks. Templates come from
 **stacks**, separate repositories such as `quanarch-react`, so any language can
