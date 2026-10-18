@@ -34,6 +34,8 @@ type Manifest struct {
 	Version   string // optional
 	Title     string // optional, human-readable
 	Templates map[quanarch.Kind]Template
+	// Examples are complete applications, by ID.
+	Examples map[string]Template
 }
 
 // Template is the template a stack provides for one kind.
@@ -81,7 +83,7 @@ func DecodeManifest(r io.Reader, file string) (*Manifest, error) {
 		return nil, errorf(header.Line, "%v", err)
 	}
 
-	m := &Manifest{Name: header.Args[0], Templates: map[quanarch.Kind]Template{}}
+	m := &Manifest{Name: header.Args[0], Templates: map[quanarch.Kind]Template{}, Examples: map[string]Template{}}
 	seen := map[string]int{}
 	for _, d := range directives[1:] {
 		switch d.Name {
@@ -112,14 +114,46 @@ func DecodeManifest(r io.Reader, file string) (*Manifest, error) {
 			}
 			m.Templates[t.Kind] = t
 
+		case "example":
+			id, t, err := decodeExample(d, errorf)
+			if err != nil {
+				return nil, err
+			}
+			if _, ok := m.Examples[id]; ok {
+				return nil, errorf(d.Line, "example %s is already declared", id)
+			}
+			m.Examples[id] = t
+
 		default:
 			return nil, errorf(d.Line, "unknown directive %q", d.Name)
 		}
 	}
-	if len(m.Templates) == 0 {
+	if len(m.Templates) == 0 && len(m.Examples) == 0 {
 		return nil, errorf(0, "stack %s declares no templates", m.Name)
 	}
 	return m, nil
+}
+
+// decodeExample reads "example <id> <dir> [{ run ... }]".
+func decodeExample(d *conf.Directive, errorf func(int, string, ...any) error) (string, Template, error) {
+	if len(d.Args) != 2 {
+		return "", Template{}, errorf(d.Line, "example takes an ID and a directory, for example \"example advanced examples/advanced\"")
+	}
+	if err := quanarch.ValidateName(d.Args[0]); err != nil {
+		return "", Template{}, errorf(d.Line, "example: %v", err)
+	}
+	dir, err := cleanRelPath(d.Args[1])
+	if err != nil {
+		return "", Template{}, errorf(d.Line, "example directory: %v", err)
+	}
+	t := Template{Dir: dir}
+	for _, inner := range d.Block {
+		if inner.Name != "run" || inner.HasBlock || len(inner.Args) == 0 {
+			return "", Template{}, errorf(inner.Line, "only run commands are allowed inside an example")
+		}
+		t.Run = append(t.Run, inner.Args)
+	}
+	return d.Args[0], t, nil
 }
 
 func decodeTemplate(d *conf.Directive, errorf func(int, string, ...any) error) (Template, error) {
