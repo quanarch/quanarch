@@ -24,6 +24,12 @@ type Language struct {
 	Available bool
 }
 
+// Usable reports whether a project can be created in l. A language whose stack is
+// not released yet can still be used with QU_STACK_DIR, which is how stacks are developed.
+func (l Language) Usable() bool {
+	return l.Available || os.Getenv("QU_STACK_DIR") != ""
+}
+
 // Languages lists every language in the order they are offered.
 var Languages = []Language{
 	{ID: "react-ts", Name: "React · TypeScript", Available: true},
@@ -268,7 +274,7 @@ func (m Model) Missing() []string {
 
 // Validate checks answers given on the command line, as the wizard would have.
 func Validate(a Answers) error {
-	if !a.Language.Available {
+	if !a.Language.Usable() {
 		return fmt.Errorf("%s is coming soon", a.Language.Name)
 	}
 	if a.Kind == Examples && !a.Example.Available {
@@ -501,7 +507,7 @@ func (m Model) updateKind(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateLanguage(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.String() == "enter" {
 		lang := Languages[m.langCursor]
-		if !lang.Available {
+		if !lang.Usable() {
 			m.err = lang.Name + " is coming soon."
 			return m, nil
 		}
