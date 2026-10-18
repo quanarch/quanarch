@@ -35,7 +35,7 @@ This repository contains `quanarch`, the command-line tool (`qu` for short).
 | Windows | `irm https://quanarch.org/install.ps1 \| iex` |
 | Homebrew | `brew install --cask quanarch/tap/quanarch` |
 | Scoop | `scoop bucket add quanarch https://github.com/quanarch/scoop-bucket` then `scoop install quanarch` |
-| Arch Linux | the `.pkg.tar.zst` package on the releases page: `sudo pacman -U quanarch-*.pkg.tar.zst` |
+| Arch Linux | download `quanarch-<version>-1-x86_64.pkg.tar.zst` from the releases page, then `sudo pacman -U ./quanarch-*.pkg.tar.zst` |
 | Debian, Ubuntu | see below |
 | Fedora, RHEL | see below |
 
