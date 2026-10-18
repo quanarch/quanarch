@@ -186,3 +186,39 @@ func TestRenderCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestQmockListsEachQuanWithItsOwnQuas(t *testing.T) {
+	st := hookStack(t, demoHooks)
+	files := map[string]string{
+		"t/quanar/src/quans.txt.qtpl": "[[ range .Quans ]][[ .Name ]]:[[ range .Quas ]] [[ .Name ]][[ end ]]\n[[ end ]]",
+		"t/quanar/src/quas.txt.qtpl":  "[[ range .Quas ]][[ .Name ]] [[ .Path ]]\n[[ end ]]",
+	}
+	for rel, content := range files {
+		if err := os.WriteFile(filepath.Join(st.Dir, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := stack.LoadManifest(st.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.Manifest = m
+	st.Manifest.Templates[quanarch.Qmock] = st.Manifest.Templates[quanarch.Quanar]
+	root := newDemoProject(t, st)
+	if _, err := NewSingle(Single{Kind: quanarch.Quan, Name: "shipping", Target: filepath.Join(root, "quans", "shipping"),
+		Qua: QuaSource{From: NewQua, Name: "ship-qua"}}, st, false, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+
+	qmock := filepath.Join(root, "qmock")
+	if _, err := NewSingle(Single{Kind: quanarch.Qmock, Name: "qmock", Target: qmock,
+		Qua: QuaSource{From: LocalQua, Name: "acme-qua", Dir: filepath.Join(root, "packages", "acme-qua")}}, st, false, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, filepath.Join(qmock, "src", "quans.txt")); got != "billing: acme-qua\nshipping: ship-qua\n" {
+		t.Errorf("quans.txt = %q", got)
+	}
+	if got := read(t, filepath.Join(qmock, "src", "quas.txt")); got != "acme-qua ../packages/acme-qua\nship-qua ../packages/ship-qua\n" {
+		t.Errorf("quas.txt = %q", got)
+	}
+}

@@ -51,6 +51,8 @@ type Quan struct {
 	// Path is the slash-separated path to the quan from the quanar or qmock a hook changes,
 	// for example "../quans/billing". Empty when the quan is not on disk next to it.
 	Path string
+	// Quas are the quas plugged into the quan.
+	Quas []Qua
 }
 
 // Qua is a qua referenced by the new project.

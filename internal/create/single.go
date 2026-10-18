@@ -98,8 +98,8 @@ func NewSingle(s Single, st Stack, run bool, out io.Writer) (Result, error) {
 		res.Port = st.Port(s.Kind)
 		data.Port = res.Port
 		if inProject {
-			for _, q := range project.Quans(root) {
-				data.Quans = append(data.Quans, render.Quan{Name: q.Name, Port: q.Port})
+			if err := takeInProjectQuans(&data, root, s.Target); err != nil {
+				return res, err
 			}
 		}
 	}
@@ -120,6 +120,38 @@ func NewSingle(s Single, st Stack, run bool, out io.Writer) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+// takeInProjectQuans lists the project's quans for a new quanar or qmock, each with its own quas,
+// and plugs in every qua they use: a quanar that lists a quan must be able to run it. A qua in
+// the project's packages is linked from there; any other is taken at the version the quan names.
+func takeInProjectQuans(data *render.Data, root, target string) error {
+	plugged := map[string]bool{}
+	for _, q := range data.Quas {
+		plugged[q.Name] = true
+	}
+	for _, q := range project.Quans(root) {
+		quan := render.Quan{Name: q.Name, Port: q.Port}
+		for _, ref := range q.Quas {
+			quan.Quas = append(quan.Quas, render.Qua{Name: ref.Name, Version: ref.Version})
+			if plugged[ref.Name] {
+				continue
+			}
+			plugged[ref.Name] = true
+			dir := filepath.Join(root, "packages", ref.Name)
+			if _, err := os.Stat(dir); err == nil {
+				qua, err := localQua(target, ref.Name, dir)
+				if err != nil {
+					return err
+				}
+				data.Quas = append(data.Quas, *qua)
+			} else {
+				data.Quas = append(data.Quas, render.Qua{Name: ref.Name, Version: ref.Version, Dependency: ref.Version})
+			}
+		}
+		data.Quans = append(data.Quans, quan)
+	}
+	return nil
 }
 
 // resolveQua turns the chosen qua source into template data, creating the qua first if asked.
@@ -222,7 +254,7 @@ func takeIn(st Stack, host string, s Single, data render.Data, run bool, out io.
 	if err != nil {
 		return err
 	}
-	quanData.Quans = []render.Quan{{Name: s.Name, Port: data.Port, Path: filepath.ToSlash(rel)}}
+	quanData.Quans = []render.Quan{{Name: s.Name, Port: data.Port, Path: filepath.ToSlash(rel), Quas: quas}}
 	changed, err := applyHooks(st, quanarch.Quan, host, quanData, run, out)
 	if err != nil {
 		res.Notes = append(res.Notes, hookNote(err, fmt.Sprintf("add %s, served on port %d, to %s", s.Name, data.Port, host)))

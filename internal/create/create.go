@@ -63,7 +63,7 @@ func NewProject(p Project, st Stack, run bool, out io.Writer) error {
 		{kind: quanarch.Project, dir: ".", data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Name, string(quanarch.Project)
 			d.Quas = quas("packages/" + p.Qua)
-			d.Quans = []render.Quan{{Name: p.Quan, Port: quanPort}}
+			d.Quans = []render.Quan{{Name: p.Quan, Port: quanPort, Quas: d.Quas}}
 		})},
 		{kind: quanarch.Qua, dir: "packages/" + p.Qua, data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Qua, string(quanarch.Qua)
@@ -71,7 +71,7 @@ func NewProject(p Project, st Stack, run bool, out io.Writer) error {
 		{kind: quanarch.Quanar, dir: "quanar", data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Quanar, string(quanarch.Quanar)
 			d.Quas = quas("../packages/" + p.Qua)
-			d.Quans = []render.Quan{{Name: p.Quan, Port: quanPort}}
+			d.Quans = []render.Quan{{Name: p.Quan, Port: quanPort, Quas: d.Quas}}
 			d.Port = st.Port(quanarch.Quanar)
 		})},
 		{kind: quanarch.Quan, dir: "quans/" + p.Quan, data: with(common, func(d *render.Data) {

@@ -56,6 +56,8 @@ type Quan struct {
 	Name string
 	Port int
 	Dir  string
+	// Quas are the quas the quan uses, as its conf.qu lists them.
+	Quas []conf.Ref
 }
 
 var portFlag = regexp.MustCompile(`--port\s+(\d+)`)
@@ -72,7 +74,7 @@ func Quans(root string) []Quan {
 		if port == 0 {
 			port = legacyWatchPort(dir)
 		}
-		quans = append(quans, Quan{Name: p.Name, Port: port, Dir: dir})
+		quans = append(quans, Quan{Name: p.Name, Port: port, Dir: dir, Quas: p.Quas})
 	}
 	return quans
 }
