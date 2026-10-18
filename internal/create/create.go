@@ -53,7 +53,7 @@ type part struct {
 func NewProject(p Project, st Stack, run bool, out io.Writer) error {
 	root := filepath.Join(p.Dir, p.Name)
 	quas := func(path string) []render.Qua {
-		return []render.Qua{{Name: p.Qua, Version: "1", Path: path}}
+		return []render.Qua{{Name: p.Qua, Version: "1", Path: path, Dependency: "file:" + path}}
 	}
 	common := render.Data{Stack: st.Manifest.Name, StackVersion: st.Manifest.Version, Project: p.Name}
 
@@ -70,6 +70,7 @@ func NewProject(p Project, st Stack, run bool, out io.Writer) error {
 			d.Name, d.Kind = p.Quanar, string(quanarch.Quanar)
 			d.Quas = quas("../packages/" + p.Qua)
 			d.Quans = []render.Quan{{Name: p.Quan, Port: QuanPort}}
+			d.Port = QuanarPort
 		})},
 		{kind: quanarch.Quan, dir: "quans/" + p.Quan, data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Quan, string(quanarch.Quan)
@@ -100,16 +101,23 @@ func NewProject(p Project, st Stack, run bool, out io.Writer) error {
 	// The qua first: the quanar and the quan depend on it.
 	for _, pt := range parts {
 		t, _ := st.template(pt.kind)
-		dir := filepath.Join(root, filepath.FromSlash(pt.dir))
-		for _, args := range t.Run {
-			fmt.Fprintf(out, "\n → %s  (%s)\n", strings.Join(args, " "), displayPath(root, dir))
-			cmd := exec.Command(args[0], args[1:]...)
-			cmd.Dir = dir
-			cmd.Stdout = out
-			cmd.Stderr = out
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("%q in %s failed: %w", strings.Join(args, " "), displayPath(root, dir), err)
-			}
+		if err := runSteps(t.Run, filepath.Join(root, filepath.FromSlash(pt.dir)), out); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// runSteps runs a template's setup commands in dir.
+func runSteps(steps [][]string, dir string, out io.Writer) error {
+	for _, args := range steps {
+		fmt.Fprintf(out, "\n → %s  (%s)\n", strings.Join(args, " "), dir)
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		cmd.Stdout = out
+		cmd.Stderr = out
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%q in %s failed: %w", strings.Join(args, " "), dir, err)
 		}
 	}
 	return nil
