@@ -39,7 +39,7 @@ var Languages = []Language{
 	{ID: "react-native", Name: "React Native · TypeScript"},
 	{ID: "node-ts", Name: "Node.js · TypeScript", Available: true},
 	{ID: "python", Name: "Python", Available: true},
-	{ID: "go", Name: "Go"},
+	{ID: "go", Name: "Go", Available: true},
 	{ID: "rust", Name: "Rust"},
 	{ID: "java", Name: "Java · Spring"},
 	{ID: "dotnet", Name: ".NET · C#"},
@@ -72,6 +72,9 @@ var ExamplesByLanguage = map[string][]Example{
 	},
 	"python": {
 		{ID: "advanced", Name: "Advanced", Summary: "full-stack shop: Starlette quanar, qua, three quans talking by events, React client", Available: true},
+	},
+	"go": {
+		{ID: "advanced", Name: "Advanced", Summary: "full-stack shop: quanar server, qua, three quans in walled processes talking by events, React client", Available: true},
 	},
 }
 
