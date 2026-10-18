@@ -100,9 +100,15 @@ Inside a project root it goes to qmock/ and lists the project's quans.`,
 
 React · TypeScript, advanced: a Node.js server with a JSON database, an
 artifact store, a quanar with sign-in, a qua and four quans, each loaded a
-different way (API, SSE, the quanar's public folder, the artifact store).`,
+different way (API, SSE, the quanar's public folder, the artifact store).
+
+Node.js · TypeScript, advanced: a full-stack shop. A quanar server whose
+managers turn what quans declare into tables, routes, permission checks and
+validation; users, products and orders quans that talk by events, each in its
+own process; and a React client.`,
 		example: `  qu new examples
-  qu new examples shop --lang react-ts --example advanced --dir .`,
+  qu new examples shop --lang react-ts --example advanced --dir .
+  qu new examples shop --lang node-ts --example advanced --dir .`,
 	},
 }
 

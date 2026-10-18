@@ -37,7 +37,7 @@ var Languages = []Language{
 	{ID: "angular", Name: "Angular · TypeScript"},
 	{ID: "svelte-ts", Name: "Svelte · TypeScript"},
 	{ID: "react-native", Name: "React Native · TypeScript"},
-	{ID: "node-ts", Name: "Node.js · TypeScript"},
+	{ID: "node-ts", Name: "Node.js · TypeScript", Available: true},
 	{ID: "python", Name: "Python"},
 	{ID: "go", Name: "Go"},
 	{ID: "rust", Name: "Rust"},
@@ -66,6 +66,9 @@ type Example struct {
 var ExamplesByLanguage = map[string][]Example{
 	"react-ts": {
 		{ID: "advanced", Name: "Advanced", Summary: "server, artifacts store, quanar, qua and four quans loaded four ways", Available: true},
+	},
+	"node-ts": {
+		{ID: "advanced", Name: "Advanced", Summary: "full-stack shop: quanar server, qua, three quans talking by events, React client", Available: true},
 	},
 }
 
