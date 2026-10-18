@@ -38,7 +38,8 @@ Run `qu check` in a project directory to validate the file.
 | `project <name>`<br>`quanar <name>`<br>`quan <name>`<br>`qua <name>`<br>`qmock <name>` | first line | Declares what it is. Required, exactly once. `qu` finds a project's root by its `project` line. |
 | `stack <stack>[@version]` | all | The stack the project was created from, for example `react-ts@1`. |
 | `version <version>` | all | The project's own version. For a qua this is the version of the contract. |
-| `qua <name>[@version]` | project, quanar, quan, qmock | In a quan, a qua it uses. In a quanar or qmock, a qua it plugs in. In a project, its quas. |
+| `port <number>` | quanar, quan, qmock | The port it is served on while it is developed. `qu` gives a new quan the next port no quan of the project uses. |
+| `qua <name>[@version]` | project, quanar, quan, qmock | In a quan, a qua it uses. In a quanar or qmock, a qua it plugs in; `qu` adds the line when it plugs one in. In a project, its quas. |
 | `zone <name> { ... }` | quan | An isolated area inside a quan. Holds only `qua` directives. |
 
 Names are lowercase kebab-case (`billing-report`). Versions take the form `1`, `1.2`

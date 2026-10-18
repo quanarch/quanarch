@@ -102,7 +102,7 @@ Help comes in layers: `qu --help`, then `qu new --help`, then
 | --- | --- |
 | project | A qua, a quanar and a quan, already wired (below). |
 | quanar | A host that loads quans and plugs in their quas. |
-| quan | Business logic with a manifest: name, version, routes and permissions. |
+| quan | Business logic; it cannot run on its own, a quanar loads it. |
 | qua | A contract: the quanar's core interface and the calls quans make. |
 | qmock | A stand-in quanar for developing quans. |
 | examples | Complete applications to learn from or start with, for example React's *advanced*: a server, an artifact store, a quanar, a qua and four quans loaded four ways. |
@@ -123,7 +123,8 @@ acme/
 Inside a project, choosing its root as the location puts a quan in `quans/`, a
 qua in `packages/` and a qmock in `qmock/`. A new quan gets the next free port,
 is added to the quanar's and the qmock's quan list, and if it brings a qua the
-quanar does not have yet, `qu` plugs that qua into them too.
+quanar does not have yet, `qu` plugs that qua into them too. How, in which files
+and with which commands, is declared by the stack, not known by `qu`.
 
 Everything `qu` creates describes itself in a [`conf.qu`](docs/conf-qu.md) file.
 
