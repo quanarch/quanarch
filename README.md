@@ -30,15 +30,30 @@ This repository contains `quanarch`, the command-line tool (`qu` for short).
 ## Usage
 
 ```sh
-qu                       # asks what to create, step by step
-qu new quan              # skips the questions you already answered
-qu new quan billing
-qu check                 # validate conf.qu in the current project
+qu                                   # asks what to create, step by step
+qu new quan                          # asks only what the command leaves out
+qu new quan billing --lang react-ts --dir . --qua acme-qua    # asks nothing
+qu check                             # validate conf.qu in the current project
 qu version
 ```
 
-`qu` asks for whatever is missing: what to create, the language, where to put it
-and its name. Arrow keys move, enter selects, esc goes back.
+`qu` asks for whatever the command leaves out: what to create, the language,
+where to put it, its name and its qua. When the command answers everything, it
+creates at once without a single question, so it works in scripts and CI too.
+In the wizard arrow keys move, enter selects, esc goes back and `?` explains
+the current question.
+
+Help comes in layers: `qu --help`, then `qu new --help`, then
+`qu new <kind> --help` for a kind's flags and full examples.
+
+| Flag | Answers |
+| --- | --- |
+| `--lang` | the language: `react-ts` |
+| `--dir` | where to create it; a project root puts each kind in its place |
+| `--qua` | quanar, quan, qmock: a qua in the project's `packages/`, a path, `name@version`, `name@url` or `none`. project: its qua's name |
+| `--new-qua` | quanar, quan, qmock: create a new qua in the project's `packages/` and use it |
+| `--quanar`, `--quan` | project: the names of its quanar and first quan |
+| `--example` | examples: which one, for example `advanced` |
 
 | Choice | What you get |
 | --- | --- |
@@ -47,7 +62,7 @@ and its name. Arrow keys move, enter selects, esc goes back.
 | quan | Business logic with a manifest: name, version, routes and permissions. |
 | qua | A contract: the quanar's core interface and the calls quans make. |
 | qmock | A stand-in quanar for developing quans. |
-| examples | Complete applications to learn from or start with. |
+| examples | Complete applications to learn from or start with, for example React's *advanced*: a server, an artifact store, a quanar, a qua and four quans loaded four ways. |
 
 A quanar, quan or qmock is then asked which qua to use: one from the project's
 `packages/`, a new one, a published one (`acme-qua@^1.0.0` or a URL), or none
