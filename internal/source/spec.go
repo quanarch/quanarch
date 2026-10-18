@@ -13,6 +13,7 @@ import (
 // Registry maps official stack names to their repositories.
 var Registry = map[string]string{
 	"react-ts": "https://github.com/quanarch/quanarch-react",
+	"node-ts":  "https://github.com/quanarch/quanarch-node",
 }
 
 // Spec says where a stack comes from, as given to --stack.
