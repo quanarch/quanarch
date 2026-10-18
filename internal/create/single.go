@@ -235,3 +235,21 @@ func registerQuan(file, name string, port int) (bool, error) {
 	entry := fmt.Sprintf("\n  { name: '%s', url: 'http://localhost:%d/%s.js' },", name, port, name)
 	return true, os.WriteFile(file, []byte(src[:end]+entry+src[end:]), 0o644)
 }
+
+// NewExample writes a stack's example application to target.
+func NewExample(id, name, target string, st Stack, run bool, out io.Writer) error {
+	t, ok := st.Manifest.Examples[id]
+	if !ok {
+		return fmt.Errorf("stack %s has no example %q", st.Manifest.Name, id)
+	}
+	data := render.Data{Name: name, Kind: "examples", Stack: st.Manifest.Name, StackVersion: st.Manifest.Version, Project: name}
+	src := os.DirFS(filepath.Join(st.Dir, filepath.FromSlash(t.Dir)))
+	if err := render.Render(src, target, data); err != nil {
+		return fmt.Errorf("example %s: %w", id, err)
+	}
+	fmt.Fprintf(out, " ✔ example %s → %s\n", id, target)
+	if !run {
+		return nil
+	}
+	return runSteps(t.Run, target, out)
+}
