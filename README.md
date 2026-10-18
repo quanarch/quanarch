@@ -37,9 +37,21 @@ qu check                 # validate conf.qu in the current project
 qu version
 ```
 
-`qu` asks for whatever is missing: what to create (project, quanar, quan, qua or
-qmock), the language, where to put it and its name. Arrow keys move, enter
-selects, esc goes back.
+`qu` asks for whatever is missing: what to create, the language, where to put it
+and its name. Arrow keys move, enter selects, esc goes back.
+
+| Choice | What you get |
+| --- | --- |
+| project | A qua, a quanar and a quan, already wired (below). |
+| quanar | A host that loads quans and plugs in their quas. |
+| quan | Business logic with a manifest: name, version, routes and permissions. |
+| qua | A contract: the quanar's core interface and the calls quans make. |
+| qmock | A stand-in quanar for developing quans. |
+| examples | Complete applications to learn from or start with. |
+
+A quanar, quan or qmock is then asked which qua to use: one from the project's
+`packages/`, a new one, a published one (`acme-qua@^1.0.0` or a URL), or none
+for now.
 
 A **project** creates the three together, already wired:
 
@@ -50,7 +62,12 @@ acme/
 └── quans/billing/       a quan: business logic, loaded by the quanar
 ```
 
-Each project describes itself in a [`conf.qu`](docs/conf-qu.md) file.
+Inside a project, choosing its root as the location puts a quan in `quans/`, a
+qua in `packages/` and a qmock in `qmock/`. A new quan gets the next free port,
+is added to the quanar's and the qmock's quan list, and if it brings a qua the
+quanar does not have yet, `qu` plugs that qua into them too.
+
+Everything `qu` creates describes itself in a [`conf.qu`](docs/conf-qu.md) file.
 
 The tool itself knows nothing about languages or frameworks. Templates come from
 **stacks**, separate repositories such as `quanarch-react`, so any language can
