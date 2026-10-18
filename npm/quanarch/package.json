@@ -1,0 +1,22 @@
+{
+  "name": "quanarch",
+  "version": "0.0.0",
+  "description": "qu, the command-line tool of Quanarch: creates quanars, quans, quas and qmocks",
+  "keywords": ["quanarch", "qu", "quan", "quanar", "qua", "architecture", "cli"],
+  "homepage": "https://quanarch.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quanarch/quanarch.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Can Berk Coşar",
+  "bin": {
+    "qu": "bin/qu.js",
+    "quanarch": "bin/quanarch.js"
+  },
+  "files": ["bin"],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {}
+}
