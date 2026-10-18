@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/quanarch/quanarch/internal/banner"
 	"github.com/quanarch/quanarch/internal/create"
 	"github.com/quanarch/quanarch/internal/quanarch"
 )
@@ -100,13 +101,15 @@ func (m Model) answer(s step) string {
 func (m Model) View() string {
 	var b strings.Builder
 
-	b.WriteString("\n " + styleBrand.Render("quanarch") + " " + styleDim.Render(m.version) + "\n\n")
-
-	if m.answers.Kind != "" && !m.has(stepKind) {
-		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(m.question(stepKind)), m.answer(stepKind))
+	b.WriteString("\n")
+	for _, row := range banner.Logo() {
+		b.WriteString(" " + styleBold.Render(row) + "\n")
 	}
-	if m.answers.Name != "" && !m.has(stepName) {
-		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(m.question(stepName)), m.answer(stepName))
+	b.WriteString(" " + styleDim.Render(m.version) + "\n " + styleDim.Render(banner.Definition) + "\n\n")
+
+	// Answers given on the command line come first, as if already asked.
+	for _, s := range m.givenSteps() {
+		fmt.Fprintf(&b, " %s %s %s\n", styleOK.Render("✔"), styleBold.Render(m.question(s)), m.answer(s))
 	}
 	for i := 0; i < m.at; i++ {
 		s := m.steps[i]
@@ -129,7 +132,10 @@ func (m Model) View() string {
 	if m.err != "" {
 		b.WriteString("\n   " + styleError.Render(m.err) + "\n")
 	}
-	b.WriteString("\n " + styleDim.Render(m.help(s)) + "\n")
+	if m.showHelp {
+		b.WriteString("\n" + styleBox.Render(stepHelp(s)) + "\n")
+	}
+	b.WriteString("\n " + styleDim.Render(m.help(s)+" · ? help") + "\n")
 	return b.String()
 }
 
@@ -327,4 +333,52 @@ func menuSummary(k quanarch.Kind) string {
 		return "complete applications to learn from or start with"
 	}
 	return k.Summary()
+}
+
+// givenSteps lists the questions the command line already answered.
+func (m Model) givenSteps() []step {
+	p := m.preset
+	var given []step
+	add := func(s step, ok bool) {
+		if ok {
+			given = append(given, s)
+		}
+	}
+	add(stepKind, p.Kind != "")
+	add(stepLanguage, p.Language != nil)
+	add(stepExample, p.Example != "" && m.answers.Kind == Examples)
+	add(stepDir, p.Dir != "")
+	add(stepName, p.Name != "")
+	add(stepQuaName, p.QuaName != "")
+	add(stepQuanarName, p.QuanarName != "")
+	add(stepQuanName, p.QuanName != "")
+	add(stepQua, p.Qua != nil)
+	return given
+}
+
+// stepHelp explains a question and the flag that answers it from the command line.
+func stepHelp(s step) string {
+	switch s {
+	case stepKind:
+		return "What to create. project makes a qua, a quanar and a quan together.\nCommand line: qu new <kind>, for example qu new quan"
+	case stepLanguage:
+		return "The language and framework of the templates.\nCommand line: --lang react-ts"
+	case stepExample:
+		return "Which complete application to create.\nCommand line: --example advanced"
+	case stepDir:
+		return "The folder to create it in. A project root puts a quan in quans/,\na qua in packages/ and a qmock in qmock/.\nCommand line: --dir ."
+	case stepName:
+		return "Lowercase letters, digits and dashes. It names the folder and the package.\nCommand line: qu new <kind> <name>"
+	case stepQuaName, stepQuanarName, stepQuanName:
+		return "Each part of a project becomes its own package, so the names must differ.\nCommand line: --qua, --quanar, --quan"
+	case stepQua:
+		return "The contract this one talks through. Inside a project: one of its quas or a\nnew one; anywhere: a published qua, or none for now.\nCommand line: --qua <name|path|name@version|none> or --new-qua <name>"
+	case stepNewQua:
+		return "The new qua is created in the project's packages/ and linked.\nCommand line: --new-qua <name>"
+	case stepQuaSpec:
+		return "An npm package with a version range, or a URL.\nCommand line: --qua acme-qua@^1.0.0"
+	case stepConfirm:
+		return "Nothing is written until you confirm. When a command answers every\nquestion, qu creates at once without asking."
+	}
+	return ""
 }

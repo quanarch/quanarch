@@ -260,8 +260,11 @@ func TestExamplesAsksForLanguageThenExample(t *testing.T) {
 	if m.current() != stepExample || !strings.Contains(m.View(), "Advanced") {
 		t.Fatalf("at %d:\n%s", m.current(), m.View())
 	}
-	m = press(t, m, "enter")
-	if m.current() != stepExample || !strings.Contains(m.err, "coming soon") {
-		t.Fatalf("an unavailable example was accepted: at %d err=%q", m.current(), m.err)
+	m = press(t, m, "enter", "enter", "shop", "enter") // advanced, current folder, name
+	if m.current() != stepConfirm || m.answers.Example.ID != "advanced" {
+		t.Fatalf("at %d err=%q example=%+v", m.current(), m.err, m.answers.Example)
+	}
+	if !strings.Contains(m.View(), "shop") {
+		t.Errorf("summary:\n%s", m.View())
 	}
 }

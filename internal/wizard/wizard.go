@@ -59,14 +59,25 @@ type Example struct {
 // ExamplesByLanguage lists the examples of each language, by language ID.
 var ExamplesByLanguage = map[string][]Example{
 	"react-ts": {
-		{ID: "advanced", Name: "Advanced", Summary: "a complete application built the Quanarch way"},
+		{ID: "advanced", Name: "Advanced", Summary: "server, artifacts store, quanar, qua and four quans loaded four ways", Available: true},
 	},
 }
 
 // Preset holds what was already given on the command line; empty fields are asked for.
 type Preset struct {
-	Kind quanarch.Kind
-	Name string
+	Kind     quanarch.Kind
+	Name     string
+	Language *Language
+	// Dir is absolute when given.
+	Dir string
+	// Qua is the qua of a quanar, quan or qmock.
+	Qua *create.QuaSource
+	// The names of a project's qua, quanar and quan.
+	QuaName    string
+	QuanarName string
+	QuanName   string
+	// Example is the ID of an example.
+	Example string
 }
 
 // Answers is the outcome of a completed wizard.
@@ -138,23 +149,36 @@ type Model struct {
 	quaCursor  int
 	exCursor   int
 	confirmYes bool
+	showHelp   bool
 	err        string
 
-	cwd        string
-	version    string
-	presetKind bool
-	presetName bool
-	done       bool
-	cancelled  bool
+	cwd       string
+	version   string
+	preset    Preset
+	done      bool
+	cancelled bool
 }
 
 // New returns a wizard that asks for everything preset leaves out.
 func New(preset Preset, cwd, version string) Model {
-	m := Model{cwd: cwd, version: version, confirmYes: true, names: map[step]*textinput.Model{}}
+	m := Model{cwd: cwd, version: version, confirmYes: true, names: map[step]*textinput.Model{}, preset: preset}
 	m.answers.Kind = preset.Kind
 	m.answers.Name = preset.Name
-	m.presetKind = preset.Kind != ""
-	m.presetName = preset.Name != ""
+	m.answers.Dir = preset.Dir
+	m.answers.Qua = preset.QuaName
+	m.answers.Quanar = preset.QuanarName
+	m.answers.Quan = preset.QuanName
+	if preset.Language != nil {
+		m.answers.Language = *preset.Language
+		for _, ex := range ExamplesByLanguage[preset.Language.ID] {
+			if ex.ID == preset.Example {
+				m.answers.Example = ex
+			}
+		}
+	}
+	if preset.Qua != nil {
+		m.answers.QuaSource = *preset.Qua
+	}
 
 	m.dirInput = textinput.New()
 	m.dirInput.Placeholder = "."
@@ -181,21 +205,29 @@ func New(preset Preset, cwd, version string) Model {
 
 // buildSteps lists the steps for the chosen kind; a project asks for more names.
 func (m Model) buildSteps() []step {
+	p := m.preset
 	var steps []step
-	if !m.presetKind {
-		steps = append(steps, stepKind)
+	add := func(s step, given bool) {
+		if !given {
+			steps = append(steps, s)
+		}
 	}
+	add(stepKind, p.Kind != "")
+	add(stepLanguage, p.Language != nil)
 	if m.answers.Kind == Examples {
-		return append(steps, stepLanguage, stepExample, stepDir, stepName, stepConfirm)
+		add(stepExample, p.Example != "")
+		add(stepDir, p.Dir != "")
+		add(stepName, p.Name != "")
+		return append(steps, stepConfirm)
 	}
-	steps = append(steps, stepLanguage, stepDir)
-	if !m.presetName {
-		steps = append(steps, stepName)
-	}
+	add(stepDir, p.Dir != "")
+	add(stepName, p.Name != "")
 	if m.answers.Kind == quanarch.Project {
-		steps = append(steps, stepQuaName, stepQuanarName, stepQuanName)
+		add(stepQuaName, p.QuaName != "")
+		add(stepQuanarName, p.QuanarName != "")
+		add(stepQuanName, p.QuanName != "")
 	}
-	if needsQua(m.answers.Kind) {
+	if needsQua(m.answers.Kind) && p.Qua == nil {
 		steps = append(steps, stepQua)
 		switch m.answers.QuaSource.From {
 		case create.NewQua:
@@ -205,6 +237,65 @@ func (m Model) buildSteps() []step {
 		}
 	}
 	return append(steps, stepConfirm)
+}
+
+// Complete reports whether the command line answered everything: nothing to ask.
+func (m Model) Complete() bool {
+	return m.answers.Kind != "" && len(m.steps) == 1
+}
+
+// Missing names what is still to be answered, as the flags that would answer it.
+func (m Model) Missing() []string {
+	flags := map[step]string{
+		stepKind:       "the kind (qu new <kind>)",
+		stepLanguage:   "--lang",
+		stepExample:    "--example",
+		stepDir:        "--dir",
+		stepName:       "the name (qu new <kind> <name>)",
+		stepQuaName:    "--qua",
+		stepQuanarName: "--quanar",
+		stepQuanName:   "--quan",
+		stepQua:        "--qua or --new-qua",
+	}
+	var missing []string
+	for _, s := range m.steps {
+		if f, ok := flags[s]; ok {
+			missing = append(missing, f)
+		}
+	}
+	return missing
+}
+
+// Validate checks answers given on the command line, as the wizard would have.
+func Validate(a Answers) error {
+	if !a.Language.Available {
+		return fmt.Errorf("%s is coming soon", a.Language.Name)
+	}
+	if a.Kind == Examples && !a.Example.Available {
+		return fmt.Errorf("example %q is not available for %s", a.Example.ID, a.Language.Name)
+	}
+	if a.Kind == quanarch.Project {
+		names := map[string]string{}
+		for _, n := range []struct{ role, name string }{{"qua", a.Qua}, {"quanar", a.Quanar}, {"quan", a.Quan}} {
+			if err := quanarch.ValidateName(n.name); err != nil {
+				return fmt.Errorf("--%s: %w", n.role, err)
+			}
+			if other, taken := names[n.name]; taken {
+				return fmt.Errorf("--%s and --%s are both %q; each becomes its own package", other, n.role, n.name)
+			}
+			names[n.name] = n.role
+		}
+	}
+	if a.QuaSource.From == create.NewQua {
+		root, ok := project.FindRoot(a.Dir)
+		if !ok {
+			return fmt.Errorf("--new-qua needs a project: run it inside one, or point --dir at one")
+		}
+		if err := checkTarget(filepath.Join(root, "packages", a.QuaSource.Name)); err != nil {
+			return err
+		}
+	}
+	return checkTarget(a.Target())
 }
 
 // buildQuaOptions offers the quas of the surrounding project, a new one, a published one or none.
@@ -253,6 +344,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "esc":
 		return m.back()
+	case "?":
+		m.showHelp = !m.showHelp
+		return m, nil
 	}
 
 	switch m.current() {
@@ -337,7 +431,7 @@ func (m Model) updateQuaSpec(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.err = ""
 		return m.updateInput(key)
 	}
-	name, spec, err := parseQuaSpec(m.names[stepQuaSpec].Value())
+	name, spec, err := ParseQuaSpec(m.names[stepQuaSpec].Value())
 	if err != nil {
 		m.err = err.Error()
 		return m, nil
@@ -346,8 +440,8 @@ func (m Model) updateQuaSpec(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.next()
 }
 
-// parseQuaSpec reads "name", "name@^1.0.0" or "name@https://…".
-func parseQuaSpec(s string) (name, spec string, err error) {
+// ParseQuaSpec reads "name", "name@^1.0.0" or "name@https://…".
+func ParseQuaSpec(s string) (name, spec string, err error) {
 	s = strings.TrimSpace(s)
 	name, spec, found := strings.Cut(s, "@")
 	if err := quanarch.ValidateName(name); err != nil {
@@ -528,6 +622,12 @@ func (m Model) updateConfirm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) resolveDir(input string) (string, error) {
+	return ResolveDir(m.cwd, input)
+}
+
+// ResolveDir turns a typed location into an absolute folder: empty means cwd,
+// ~ means home, relative paths start at cwd. A missing folder is fine.
+func ResolveDir(cwd, input string) (string, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		input = "."
@@ -538,7 +638,7 @@ func (m Model) resolveDir(input string) (string, error) {
 		}
 	}
 	if !filepath.IsAbs(input) {
-		input = filepath.Join(m.cwd, input)
+		input = filepath.Join(cwd, input)
 	}
 	dir := filepath.Clean(input)
 	info, err := os.Stat(dir)
