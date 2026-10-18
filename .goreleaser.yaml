@@ -66,6 +66,11 @@ nfpms:
     formats: [deb, rpm, apk, archlinux]
     bindir: /usr/bin
     file_name_template: '{{ .ConventionalFileName }}'
+    # rpm packages are signed with the Relteco package key, so dnf can check
+    # them with gpgcheck=1. The passphrase comes from NFPM_PASSPHRASE.
+    rpm:
+      signature:
+        key_file: '{{ index .Env "NFPM_GPG_KEY_FILE" }}'
 
 # brew install quanarch/tap/quanarch (macOS and Linux)
 homebrew_casks:

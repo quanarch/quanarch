@@ -24,6 +24,16 @@ jobs:
           go-version-file: go.mod
       - run: go test ./...
 
+      # The Relteco package key signs the rpm packages.
+      - name: Write the package signing key
+        env:
+          GPG_KEY: ${{ secrets.RELTECO_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "$GPG_KEY" ]; then
+            printf '%s\n' "$GPG_KEY" > "$RUNNER_TEMP/relteco.asc"
+            echo "NFPM_GPG_KEY_FILE=$RUNNER_TEMP/relteco.asc" >> "$GITHUB_ENV"
+          fi
+
       # Archives and Linux packages go to GitHub Releases. The Homebrew tap, the
       # Scoop bucket and the AUR are updated when their secrets are set.
       - uses: goreleaser/goreleaser-action@v7
@@ -34,6 +44,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
           AUR_KEY: ${{ secrets.AUR_KEY }}
+          NFPM_PASSPHRASE: ${{ secrets.RELTECO_GPG_PASSPHRASE }}
 
       # apt install quanarch / dnf install quanarch, from the Nexus repositories.
       - name: Upload packages to the apt and yum repositories
