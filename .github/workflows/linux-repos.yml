@@ -1,0 +1,43 @@
+name: linux-repos
+
+# Uploads a release's .deb and .rpm packages to the apt and yum repositories.
+# The release workflow does this for every new release; run this by hand to
+# upload an existing release again.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v0.2.2
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  NEXUS_URL: https://repo.relteco.com/repository
+  APT_REPO: apt-relteco
+  YUM_REPO: yum-relteco
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the release's packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ inputs.tag }}" -R "${{ github.repository }}" -p '*.deb' -p '*.rpm' -D dist
+
+      - name: Upload to the apt and yum repositories
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_PUBLISH_USERNAME || vars.NEXUS_PUBLISH_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PUBLISH_PASSWORD || vars.NEXUS_PUBLISH_PASSWORD }}
+        run: |
+          upload() { curl -fsS -u "$NEXUS_USERNAME:$NEXUS_PASSWORD" "$@"; }
+          for f in dist/*.deb; do
+            echo "apt ← $f"
+            upload -H "Content-Type: multipart/form-data" --data-binary "@$f" "$NEXUS_URL/$APT_REPO/"
+          done
+          for f in dist/*.rpm; do
+            echo "yum ← $f"
+            upload -T "$f" "$NEXUS_URL/$YUM_REPO/$(basename "$f")"
+          done
