@@ -109,11 +109,15 @@ own process; and a React client.
 
 Python, advanced: the same shop in Python. A Starlette quanar with the same
 managers, quans that declare themselves with dataclasses, each in its own
-Python process, and the React client.`,
+Python process, and the React client.
+
+Go, advanced: the same shop in Go. Quans that declare themselves in a
+Manifest and are built into their own walled programs, and the React client.`,
 		example: `  qu new examples
   qu new examples shop --lang react-ts --example advanced --dir .
   qu new examples shop --lang node-ts --example advanced --dir .
-  qu new examples shop --lang python --example advanced --dir .`,
+  qu new examples shop --lang python --example advanced --dir .
+  qu new examples shop --lang go --example advanced --dir .`,
 	},
 }
 

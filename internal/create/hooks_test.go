@@ -43,7 +43,7 @@ func hookStack(t *testing.T, hooks string) Stack {
 	return Stack{Dir: dir, Manifest: m}
 }
 
-const demoHooks = `on quan insert src/list.txt "// qu:quans" "[[ .Name ]] :[[ .Port ]] [[ range .Quas ]][[ .Name ]][[ end ]]"
+const demoHooks = `on quan insert src/list.txt "// qu:quans" "[[ .Name ]] :[[ .Port ]] [[ range .Quas ]][[ .Name ]][[ end ]] at [[ (index .Quans 0).Path ]]"
 on qua insert src/core.txt "// qu:cores" {
 	line "core [[ .Name ]] {"
 	line "  from [[ .Dependency ]]"
@@ -92,7 +92,7 @@ func TestNewQuanIsTakenInTheWayTheStackSays(t *testing.T) {
 	if res.Port != 5002 || len(res.Registered) != 1 || len(res.Wired) != 0 || len(res.Notes) != 0 {
 		t.Errorf("result = %+v", res)
 	}
-	if got := read(t, filepath.Join(quanar, "src", "list.txt")); got != "quans:\n  stock :5002 acme-qua\n  // qu:quans\n" {
+	if got := read(t, filepath.Join(quanar, "src", "list.txt")); got != "quans:\n  stock :5002 acme-qua at ../quans/stock\n  // qu:quans\n" {
 		t.Errorf("list.txt = %q", got)
 	}
 	if got := read(t, filepath.Join(quanar, "src", "core.txt")); got != "cores:\n// qu:cores\n" {
@@ -128,7 +128,7 @@ func TestHooksAreNotAppliedTwice(t *testing.T) {
 			t.Errorf("round %d: changed=%v err=%v, want %v", i, changed, err, want)
 		}
 	}
-	if got := strings.Count(read(t, filepath.Join(quanar, "src", "list.txt")), "stock"); got != 1 {
+	if got := strings.Count(read(t, filepath.Join(quanar, "src", "list.txt")), "stock :5002"); got != 1 {
 		t.Errorf("stock is listed %d times", got)
 	}
 }
@@ -166,7 +166,8 @@ func TestStackWithoutHooksLeavesANote(t *testing.T) {
 }
 
 func renderData(name string, port int, qua string) render.Data {
-	return render.Data{Name: name, Kind: "quan", Port: port, Quas: []render.Qua{{Name: qua, Version: "1"}}}
+	return render.Data{Name: name, Kind: "quan", Port: port, Quas: []render.Qua{{Name: qua, Version: "1"}},
+		Quans: []render.Quan{{Name: name, Port: port, Path: "../quans/" + name}}}
 }
 
 func TestRenderCommand(t *testing.T) {
@@ -183,5 +184,41 @@ func TestRenderCommand(t *testing.T) {
 		if err != nil || strings.Join(got, "|") != c.want {
 			t.Errorf("%q = %q, %v; want %q", c.args, got, err, c.want)
 		}
+	}
+}
+
+func TestQmockListsEachQuanWithItsOwnQuas(t *testing.T) {
+	st := hookStack(t, demoHooks)
+	files := map[string]string{
+		"t/quanar/src/quans.txt.qtpl": "[[ range .Quans ]][[ .Name ]]:[[ range .Quas ]] [[ .Name ]][[ end ]]\n[[ end ]]",
+		"t/quanar/src/quas.txt.qtpl":  "[[ range .Quas ]][[ .Name ]] [[ .Path ]]\n[[ end ]]",
+	}
+	for rel, content := range files {
+		if err := os.WriteFile(filepath.Join(st.Dir, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := stack.LoadManifest(st.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.Manifest = m
+	st.Manifest.Templates[quanarch.Qmock] = st.Manifest.Templates[quanarch.Quanar]
+	root := newDemoProject(t, st)
+	if _, err := NewSingle(Single{Kind: quanarch.Quan, Name: "shipping", Target: filepath.Join(root, "quans", "shipping"),
+		Qua: QuaSource{From: NewQua, Name: "ship-qua"}}, st, false, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+
+	qmock := filepath.Join(root, "qmock")
+	if _, err := NewSingle(Single{Kind: quanarch.Qmock, Name: "qmock", Target: qmock,
+		Qua: QuaSource{From: LocalQua, Name: "acme-qua", Dir: filepath.Join(root, "packages", "acme-qua")}}, st, false, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, filepath.Join(qmock, "src", "quans.txt")); got != "billing: acme-qua\nshipping: ship-qua\n" {
+		t.Errorf("quans.txt = %q", got)
+	}
+	if got := read(t, filepath.Join(qmock, "src", "quas.txt")); got != "acme-qua ../packages/acme-qua\nship-qua ../packages/ship-qua\n" {
+		t.Errorf("quas.txt = %q", got)
 	}
 }
