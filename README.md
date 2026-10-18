@@ -27,6 +27,48 @@ This repository contains `quanarch`, the command-line tool (`qu` for short).
 > [!NOTE]
 > Quanarch is in early development. Commands and file formats may change before 1.0.
 
+## Install
+
+| System | |
+| --- | --- |
+| Linux, macOS | `curl -fsSL https://quanarch.org/install.sh \| sh` |
+| Windows | `irm https://quanarch.org/install.ps1 \| iex` |
+| Homebrew | `brew install --cask quanarch/tap/quanarch` |
+| Scoop | `scoop bucket add quanarch https://github.com/quanarch/scoop-bucket` then `scoop install quanarch` |
+| Arch Linux | the `.pkg.tar.zst` package on the releases page: `sudo pacman -U quanarch-*.pkg.tar.zst` |
+| Debian, Ubuntu | see below |
+| Fedora, RHEL | see below |
+
+Every release also carries `.deb`, `.rpm`, `.apk` and Arch packages and plain
+archives on the [releases page](https://github.com/quanarch/quanarch/releases).
+The install scripts check each download against the release's `checksums.txt`.
+
+**Debian, Ubuntu**
+
+```sh
+curl -fsSL https://quanarch.org/relteco.gpg | sudo gpg --dearmor -o /usr/share/keyrings/relteco.gpg
+echo "deb [signed-by=/usr/share/keyrings/relteco.gpg] https://repo.relteco.com/repository/apt-relteco stable main" \
+  | sudo tee /etc/apt/sources.list.d/relteco.list
+sudo apt update && sudo apt install quanarch
+```
+
+**Fedora, RHEL**
+
+```sh
+sudo tee /etc/yum.repos.d/relteco.repo <<'REPO'
+[relteco]
+name=Relteco
+baseurl=https://repo.relteco.com/repository/yum-relteco/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://quanarch.org/relteco.gpg
+REPO
+sudo dnf install quanarch
+```
+
+`qu` is the short name of `quanarch`; both are installed.
+
 ## Usage
 
 ```sh
