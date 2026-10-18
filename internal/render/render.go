@@ -37,6 +37,10 @@ type Data struct {
 	Quans []Quan
 	// Port is the port a quan is served on while it is developed.
 	Port int
+	// Version and Dependency describe a qua being plugged into a quanar or qmock.
+	// Dependency is what that host's package manager needs: "file:../packages/qua-a", "^1.0.0" or a URL.
+	Version    string
+	Dependency string
 }
 
 // Quan is a quan a quanar loads.
@@ -53,7 +57,7 @@ type Qua struct {
 	// Path is the slash-separated path from the new project to a qua on disk,
 	// for example "../qua-a". Empty when the qua comes from a registry.
 	Path string
-	// Dependency is the value for package.json: "file:../qua-a", "^1.0.0" or a URL.
+	// Dependency is what a package manager needs to fetch the qua: "file:../qua-a", "^1.0.0" or a URL.
 	Dependency string
 }
 
@@ -221,6 +225,12 @@ func renderPath(p string, data Data) (string, error) {
 		segments[i] = seg
 	}
 	return path.Join(segments...), nil
+}
+
+// Text renders one template string. name is used only in error messages.
+func Text(name, text string, data Data) (string, error) {
+	out, err := execute(name, text, data)
+	return string(out), err
 }
 
 func execute(name, text string, data Data) ([]byte, error) {

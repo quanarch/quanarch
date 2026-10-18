@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/quanarch/quanarch/internal/quanarch"
@@ -17,6 +18,8 @@ type Project struct {
 	Name    string
 	Version string // optional
 	Stack   *Ref   // optional
+	// Port is the port a quan, quanar or qmock is served on while it is developed; 0 if not given.
+	Port int
 	// Quas lists the quas a quan uses or a quanar plugs in. Always empty for a qua.
 	Quas  []Ref
 	Zones []Zone // quans only
@@ -145,6 +148,23 @@ func (d decoder) project(directives []*Directive) (*Project, error) {
 				return nil, d.errorf(dir.Line, "stack: %v", err)
 			}
 			p.Stack = &ref
+
+		case "port":
+			if line, ok := seen[dir.Name]; ok {
+				return nil, d.errorf(dir.Line, "port is already set on line %d", line)
+			}
+			seen[dir.Name] = dir.Line
+			if kind == quanarch.Qua || kind == quanarch.Project {
+				return nil, d.errorf(dir.Line, "a %s has no port", kind)
+			}
+			if err := d.oneArg(dir); err != nil {
+				return nil, err
+			}
+			port, err := strconv.Atoi(dir.Args[0])
+			if err != nil || port < 1 || port > 65535 {
+				return nil, d.errorf(dir.Line, "invalid port %q (expected a number between 1 and 65535)", dir.Args[0])
+			}
+			p.Port = port
 
 		case "qua":
 			if kind == quanarch.Qua {

@@ -3,11 +3,11 @@ package create
 import (
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/quanarch/quanarch/internal/quanarch"
 	"github.com/quanarch/quanarch/internal/stack"
 )
 
@@ -86,9 +86,10 @@ func TestNewProjectNeedsEveryTemplate(t *testing.T) {
 	}
 }
 
-// TestStackProject creates a project from a real stack, installs it and builds
-// every part. It runs only when QU_E2E_STACK_DIR points at a stack, as in a
-// stack repository's CI.
+// TestStackProject creates a project from a real stack and runs the stack's own commands,
+// then adds a quan that brings a new qua, so the stack's hooks run with its real tools.
+// It runs only when QU_E2E_STACK_DIR points at a stack, as in a stack repository's CI;
+// what the parts must look like inside is for that repository to check.
 func TestStackProject(t *testing.T) {
 	dir := os.Getenv("QU_E2E_STACK_DIR")
 	if dir == "" {
@@ -98,34 +99,27 @@ func TestStackProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	st := Stack{Dir: dir, Manifest: m}
 	parent := t.TempDir()
 	p := Project{Dir: parent, Name: "acme", Qua: "acme-qua", Quanar: "acme-quanar", Quan: "billing"}
-	if err := NewProject(p, Stack{Dir: dir, Manifest: m}, true, testWriter{t}); err != nil {
+	if err := NewProject(p, st, true, testWriter{t}); err != nil {
 		t.Fatal(err)
 	}
 
 	root := filepath.Join(parent, "acme")
-	for _, step := range []struct{ dir, script string }{
-		{"quans/billing", "typecheck"},
-		{"quans/billing", "build"},
-		{"quanar", "build"},
-	} {
-		cmd := exec.Command("npm", "run", step.script)
-		cmd.Dir = filepath.Join(root, filepath.FromSlash(step.dir))
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("npm run %s in %s: %v\n%s", step.script, step.dir, err, out)
-		}
-	}
-
-	bundle, err := os.ReadFile(filepath.Join(root, "quans", "billing", "dist", "billing.js"))
+	res, err := NewSingle(Single{Kind: quanarch.Quan, Name: "invoices", Target: filepath.Join(root, "quans", "invoices"),
+		Qua: QuaSource{From: NewQua, Name: "invoices-qua"}}, st, true, testWriter{t})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(bundle), "react.transitional.element") {
-		t.Error("the quan bundles its own React")
+	if len(res.Notes) != 0 {
+		t.Errorf("the stack's hooks left work to do by hand: %q", res.Notes)
 	}
-	if !strings.Contains(string(bundle), "window.BillingQuan") {
-		t.Error("the quan does not publish its manifest on window.BillingQuan")
+	if len(st.hooks(quanarch.Quan)) > 0 && len(res.Registered) == 0 {
+		t.Error("the new quan was not added to the quanar")
+	}
+	if len(st.hooks(quanarch.Qua)) > 0 && len(res.Wired) == 0 {
+		t.Error("the new qua was not plugged into the quanar")
 	}
 }
 

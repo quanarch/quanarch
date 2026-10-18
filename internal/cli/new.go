@@ -307,7 +307,11 @@ func create(cmd *cobra.Command, a wizard.Answers) error {
 		if err := createpkg.NewExample(a.Example.ID, a.Name, a.Target(), st, true, out); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "\n Done. Start everything with:\n\n   cd %s && make run     # or: npm start\n\n", a.Name)
+		fmt.Fprintf(out, "\n Done.\n")
+		if start := st.Manifest.Examples[a.Example.ID].Start; start != nil {
+			fmt.Fprintf(out, " Start everything with:\n\n   cd %s && %s\n", a.Name, strings.Join(start, " "))
+		}
+		fmt.Fprintln(out)
 		return nil
 	}
 	if a.Kind != quanarch.Project {
@@ -318,10 +322,17 @@ func create(cmd *cobra.Command, a wizard.Answers) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "\n Done. Run it in two terminals:\n\n")
-	fmt.Fprintf(out, "   cd %s && npm run watch\n", filepath.Join(a.Name, "quans", a.Quan))
-	fmt.Fprintf(out, "   cd %s && npm run dev\n\n", filepath.Join(a.Name, "quanar"))
-	fmt.Fprintf(out, " Then open http://localhost:5173/%s\n\n", a.Quan)
+	quanStart, quanarStart := st.Start(quanarch.Quan), st.Start(quanarch.Quanar)
+	fmt.Fprintf(out, "\n Done.\n")
+	if quanStart != nil && quanarStart != nil {
+		fmt.Fprintf(out, " Run it in two terminals:\n\n")
+		fmt.Fprintf(out, "   cd %s && %s\n", filepath.Join(a.Name, "quanar"), strings.Join(quanarStart, " "))
+		fmt.Fprintf(out, "   cd %s && %s\n", filepath.Join(a.Name, "quans", a.Quan), strings.Join(quanStart, " "))
+		if port := st.Port(quanarch.Quanar); port != 0 {
+			fmt.Fprintf(out, "\n Then open http://localhost:%d/%s\n", port, a.Quan)
+		}
+	}
+	fmt.Fprintln(out)
 	return nil
 }
 
@@ -334,20 +345,29 @@ func createSingle(cmd *cobra.Command, a wizard.Answers, st createpkg.Stack) erro
 	}
 
 	fmt.Fprintf(out, "\n Done.\n\n")
+	start := st.Start(a.Kind)
 	switch a.Kind {
 	case quanarch.Quan:
-		fmt.Fprintf(out, "   cd %s && npm run watch    # serves the quan on port %d\n\n", target, res.Port)
-		for _, file := range res.Registered {
-			fmt.Fprintf(out, " Added to %s\n", file)
+		if start != nil {
+			fmt.Fprintf(out, "   cd %s && %s    # serves the quan on port %d\n\n", target, strings.Join(start, " "), res.Port)
 		}
 		for _, host := range res.Wired {
 			fmt.Fprintf(out, " Plugged its qua into %s\n", host)
 		}
-		if len(res.Registered) == 0 {
-			fmt.Fprintf(out, " Add it to your quanar's quan list:\n   { name: '%s', url: 'http://localhost:%d/%s.js' }\n", a.Name, res.Port, a.Name)
+		for _, host := range res.Registered {
+			fmt.Fprintf(out, " Added to %s\n", host)
+		}
+		if len(res.Registered) == 0 && len(res.Notes) == 0 {
+			fmt.Fprintf(out, " Add it to your quanar's quan list: %s, served on port %d.\n", a.Name, res.Port)
 		}
 	case quanarch.Quanar, quanarch.Qmock:
-		fmt.Fprintf(out, "   cd %s && npm run dev    # http://localhost:%d\n", target, res.Port)
+		if start != nil {
+			comment := ""
+			if res.Port != 0 {
+				comment = fmt.Sprintf("    # http://localhost:%d", res.Port)
+			}
+			fmt.Fprintf(out, "   cd %s && %s%s\n", target, strings.Join(start, " "), comment)
+		}
 	case quanarch.Qua:
 		fmt.Fprintf(out, " Built into %s. Link it from a quanar and its quans.\n", filepath.Join(target, "dist"))
 	}
