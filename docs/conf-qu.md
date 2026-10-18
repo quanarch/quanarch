@@ -1,6 +1,6 @@
 # conf.qu
 
-`conf.qu` identifies a Quanarch project. It sits at the root of a quan, quanar or
+`conf.qu` identifies a Quanarch project. It sits at the root of a project, quanar, quan, qua or qmock,
 qua and tells tools what the project is, which stack it was made from and which quas
 it is wired to.
 
@@ -35,10 +35,10 @@ Run `qu check` in a project directory to validate the file.
 
 | Directive | Allowed in | Description |
 | --- | --- | --- |
-| `quan <name>`<br>`quanar <name>`<br>`qua <name>` | first line | Declares what the project is. Required, exactly once. |
+| `project <name>`<br>`quanar <name>`<br>`quan <name>`<br>`qua <name>`<br>`qmock <name>` | first line | Declares what it is. Required, exactly once. `qu` finds a project's root by its `project` line. |
 | `stack <stack>[@version]` | all | The stack the project was created from, for example `react-ts@1`. |
 | `version <version>` | all | The project's own version. For a qua this is the version of the contract. |
-| `qua <name>[@version]` | quan, quanar | In a quan, a qua it uses. In a quanar, a qua it plugs in. |
+| `qua <name>[@version]` | project, quanar, quan, qmock | In a quan, a qua it uses. In a quanar or qmock, a qua it plugs in. In a project, its quas. |
 | `zone <name> { ... }` | quan | An isolated area inside a quan. Holds only `qua` directives. |
 
 Names are lowercase kebab-case (`billing-report`). Versions take the form `1`, `1.2`

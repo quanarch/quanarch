@@ -135,3 +135,19 @@ func (w testWriter) Write(p []byte) (int, error) {
 	w.t.Log(strings.TrimRight(string(p), "\n"))
 	return len(p), nil
 }
+
+func TestInsertBeforeMatchesWholeMarkerLines(t *testing.T) {
+	src := "a\n    // qu:x-types\n// qu:x\nb\n"
+	got := insertBefore(src, "// qu:x", "one\ntwo")
+	want := "a\n    // qu:x-types\none\ntwo\n// qu:x\nb\n"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	got = insertBefore(src, "// qu:x-types", "t")
+	if !strings.Contains(got, "    t\n    // qu:x-types") {
+		t.Errorf("indent not kept: %q", got)
+	}
+	if markerAt(src, "// qu:missing") != -1 {
+		t.Error("found a missing marker")
+	}
+}

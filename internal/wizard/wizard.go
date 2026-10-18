@@ -12,6 +12,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/quanarch/quanarch/internal/create"
+	"github.com/quanarch/quanarch/internal/project"
 	"github.com/quanarch/quanarch/internal/quanarch"
 )
 
@@ -39,6 +41,28 @@ var Languages = []Language{
 	{ID: "flutter", Name: "Flutter · Dart"},
 }
 
+// Examples is the menu entry for complete example applications. It is not a
+// kind of Quanarch building block, only something qu can set up.
+const Examples quanarch.Kind = "examples"
+
+// menu lists the entries of the first question.
+var menu = append(append([]quanarch.Kind{}, quanarch.Kinds...), Examples)
+
+// Example is a complete application in one language.
+type Example struct {
+	ID        string
+	Name      string
+	Summary   string
+	Available bool
+}
+
+// ExamplesByLanguage lists the examples of each language, by language ID.
+var ExamplesByLanguage = map[string][]Example{
+	"react-ts": {
+		{ID: "advanced", Name: "Advanced", Summary: "a complete application built the Quanarch way"},
+	},
+}
+
 // Preset holds what was already given on the command line; empty fields are asked for.
 type Preset struct {
 	Kind quanarch.Kind
@@ -56,11 +80,24 @@ type Answers struct {
 	Qua    string
 	Quanar string
 	Quan   string
+	// For a quanar, quan or qmock: where its qua comes from.
+	QuaSource create.QuaSource
+	// For examples: the chosen example.
+	Example Example
 }
 
-// Target is the absolute path of the project to create.
+// Target is the absolute path of the folder to create. Inside a project root a
+// quan goes in quans/, a qua in packages/ and so on.
 func (a Answers) Target() string {
-	return filepath.Join(a.Dir, a.Name)
+	if a.Kind == quanarch.Project || a.Kind == "" {
+		return filepath.Join(a.Dir, a.Name)
+	}
+	return project.Place(a.Kind, a.Dir, a.Name)
+}
+
+// needsQua reports whether the kind is wired to a qua.
+func needsQua(k quanarch.Kind) bool {
+	return k == quanarch.Quanar || k == quanarch.Quan || k == quanarch.Qmock
 }
 
 type step int
@@ -73,8 +110,19 @@ const (
 	stepQuaName
 	stepQuanarName
 	stepQuanName
+	stepQua
+	stepNewQua
+	stepQuaSpec
+	stepExample
 	stepConfirm
 )
+
+// quaOption is one answer to "which qua?".
+type quaOption struct {
+	label  string
+	hint   string
+	source create.QuaSource
+}
 
 // Model is the wizard's state. It is a Bubble Tea model.
 type Model struct {
@@ -86,6 +134,9 @@ type Model struct {
 	langCursor int
 	dirInput   textinput.Model
 	names      map[step]*textinput.Model
+	quaOptions []quaOption
+	quaCursor  int
+	exCursor   int
 	confirmYes bool
 	err        string
 
@@ -110,7 +161,7 @@ func New(preset Preset, cwd, version string) Model {
 	m.dirInput.Prompt = ""
 	m.dirInput.CharLimit = 4096
 
-	for _, s := range []step{stepName, stepQuaName, stepQuanarName, stepQuanName} {
+	for _, s := range []step{stepName, stepQuaName, stepQuanarName, stepQuanName, stepNewQua, stepQuaSpec} {
 		in := textinput.New()
 		in.Prompt = ""
 		in.CharLimit = 64
@@ -120,6 +171,9 @@ func New(preset Preset, cwd, version string) Model {
 	m.names[stepQuaName].Placeholder = "acme-qua"
 	m.names[stepQuanarName].Placeholder = "acme-quanar"
 	m.names[stepQuanName].Placeholder = "billing"
+	m.names[stepNewQua].Placeholder = "acme-qua"
+	m.names[stepQuaSpec].Placeholder = "acme-qua@^1.0.0"
+	m.names[stepQuaSpec].CharLimit = 2048
 
 	m.steps = m.buildSteps()
 	return m
@@ -131,6 +185,9 @@ func (m Model) buildSteps() []step {
 	if !m.presetKind {
 		steps = append(steps, stepKind)
 	}
+	if m.answers.Kind == Examples {
+		return append(steps, stepLanguage, stepExample, stepDir, stepName, stepConfirm)
+	}
 	steps = append(steps, stepLanguage, stepDir)
 	if !m.presetName {
 		steps = append(steps, stepName)
@@ -138,7 +195,38 @@ func (m Model) buildSteps() []step {
 	if m.answers.Kind == quanarch.Project {
 		steps = append(steps, stepQuaName, stepQuanarName, stepQuanName)
 	}
+	if needsQua(m.answers.Kind) {
+		steps = append(steps, stepQua)
+		switch m.answers.QuaSource.From {
+		case create.NewQua:
+			steps = append(steps, stepNewQua)
+		case create.PublishedQua:
+			steps = append(steps, stepQuaSpec)
+		}
+	}
 	return append(steps, stepConfirm)
+}
+
+// buildQuaOptions offers the quas of the surrounding project, a new one, a published one or none.
+func (m Model) buildQuaOptions() []quaOption {
+	var opts []quaOption
+	root, inProject := project.FindRoot(m.answers.Dir)
+	if inProject {
+		for _, q := range project.Quas(root) {
+			rel, _ := filepath.Rel(root, q.Dir)
+			hint := filepath.ToSlash(rel)
+			if q.Version != "" {
+				hint += " · v" + q.Version
+			}
+			opts = append(opts, quaOption{label: q.Name, hint: hint, source: create.QuaSource{From: create.LocalQua, Name: q.Name, Dir: q.Dir}})
+		}
+		opts = append(opts, quaOption{label: "Create a new qua", hint: "in packages/", source: create.QuaSource{From: create.NewQua}})
+	}
+	opts = append(opts,
+		quaOption{label: "Use a published qua", hint: "an npm package or a URL", source: create.QuaSource{From: create.PublishedQua}},
+		quaOption{label: "No qua for now", hint: "its README will say one is needed", source: create.QuaSource{From: create.NoQua}},
+	)
+	return opts
 }
 
 // Done reports whether the user confirmed; Answers is then complete.
@@ -174,8 +262,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateLanguage(key)
 	case stepDir:
 		return m.updateDir(key)
-	case stepName, stepQuaName, stepQuanarName, stepQuanName:
+	case stepName, stepQuaName, stepQuanarName, stepQuanName, stepNewQua:
 		return m.updateName(key)
+	case stepQua:
+		return m.updateQua(key)
+	case stepQuaSpec:
+		return m.updateQuaSpec(key)
+	case stepExample:
+		return m.updateExample(key)
 	case stepConfirm:
 		return m.updateConfirm(key)
 	}
@@ -195,7 +289,74 @@ func (m Model) back() (tea.Model, tea.Cmd) {
 func (m Model) next() (tea.Model, tea.Cmd) {
 	m.err = ""
 	m.at++
+	if m.current() == stepQua {
+		m.quaOptions = m.buildQuaOptions()
+		if m.quaCursor >= len(m.quaOptions) {
+			m.quaCursor = 0
+		}
+	}
 	return m, m.focus()
+}
+
+// examples returns the examples of the chosen language.
+func (m Model) examples() []Example {
+	return ExamplesByLanguage[m.answers.Language.ID]
+}
+
+func (m Model) updateExample(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	list := m.examples()
+	if len(list) == 0 {
+		return m, nil
+	}
+	if key.String() == "enter" {
+		ex := list[m.exCursor]
+		if !ex.Available {
+			m.err = "The " + strings.ToLower(ex.Name) + " example is coming soon."
+			return m, nil
+		}
+		m.answers.Example = ex
+		return m.next()
+	}
+	m.err = ""
+	m.exCursor = moveCursor(m.exCursor, len(list), key.String())
+	return m, nil
+}
+
+func (m Model) updateQua(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key.String() == "enter" {
+		m.answers.QuaSource = m.quaOptions[m.quaCursor].source
+		m.steps = m.buildSteps()
+		return m.next()
+	}
+	m.quaCursor = moveCursor(m.quaCursor, len(m.quaOptions), key.String())
+	return m, nil
+}
+
+func (m Model) updateQuaSpec(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key.String() != "enter" {
+		m.err = ""
+		return m.updateInput(key)
+	}
+	name, spec, err := parseQuaSpec(m.names[stepQuaSpec].Value())
+	if err != nil {
+		m.err = err.Error()
+		return m, nil
+	}
+	m.answers.QuaSource = create.QuaSource{From: create.PublishedQua, Name: name, Spec: spec}
+	return m.next()
+}
+
+// parseQuaSpec reads "name", "name@^1.0.0" or "name@https://…".
+func parseQuaSpec(s string) (name, spec string, err error) {
+	s = strings.TrimSpace(s)
+	name, spec, found := strings.Cut(s, "@")
+	if err := quanarch.ValidateName(name); err != nil {
+		return "", "", fmt.Errorf("qua %v", err)
+	}
+	if !found || spec == "" {
+		spec = "latest"
+	}
+	return name, spec, nil
 }
 
 // focus gives keyboard focus to the text input of the current step, if any.
@@ -235,11 +396,11 @@ func moveCursor(cursor, n int, key string) int {
 
 func (m Model) updateKind(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.String() == "enter" {
-		m.answers.Kind = quanarch.Kinds[m.kindCursor]
+		m.answers.Kind = menu[m.kindCursor]
 		m.steps = m.buildSteps()
 		return m.next()
 	}
-	m.kindCursor = moveCursor(m.kindCursor, len(quanarch.Kinds), key.String())
+	m.kindCursor = moveCursor(m.kindCursor, len(menu), key.String())
 	return m, nil
 }
 
@@ -296,11 +457,24 @@ func (m Model) updateName(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch m.current() {
 	case stepName:
-		if err := checkTarget(filepath.Join(m.answers.Dir, name)); err != nil {
+		a := m.answers
+		a.Name = name
+		if err := checkTarget(a.Target()); err != nil {
 			m.err = err.Error()
 			return m, nil
 		}
 		m.answers.Name = name
+	case stepNewQua:
+		if name == m.answers.Name {
+			m.err = fmt.Sprintf("%q is already the %s's name", name, m.answers.Kind)
+			return m, nil
+		}
+		root, _ := project.FindRoot(m.answers.Dir)
+		if err := checkTarget(filepath.Join(root, "packages", name)); err != nil {
+			m.err = err.Error()
+			return m, nil
+		}
+		m.answers.QuaSource = create.QuaSource{From: create.NewQua, Name: name}
 	case stepQuaName:
 		m.answers.Qua = name
 	case stepQuanarName:

@@ -53,6 +53,8 @@ type Qua struct {
 	// Path is the slash-separated path from the new project to a qua on disk,
 	// for example "../qua-a". Empty when the qua comes from a registry.
 	Path string
+	// Dependency is the value for package.json: "file:../qua-a", "^1.0.0" or a URL.
+	Dependency string
 }
 
 // Funcs are the helper functions available to templates.
