@@ -54,8 +54,9 @@ type Quan struct {
 type Qua struct {
 	Name    string // for example "qua-a"
 	Version string // may be empty
-	// Path is the slash-separated path from the new project to a qua on disk,
-	// for example "../qua-a". Empty when the qua comes from a registry.
+	// Path is the slash-separated path to a qua on disk from the project being written,
+	// or from the quanar or qmock a hook changes, for example "../qua-a". Empty when the
+	// qua comes from a registry.
 	Path string
 	// Dependency is what a package manager needs to fetch the qua: "file:../qua-a", "^1.0.0" or a URL.
 	Dependency string

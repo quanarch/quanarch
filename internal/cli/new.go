@@ -105,10 +105,15 @@ different way (API, SSE, the quanar's public folder, the artifact store).
 Node.js · TypeScript, advanced: a full-stack shop. A quanar server whose
 managers turn what quans declare into tables, routes, permission checks and
 validation; users, products and orders quans that talk by events, each in its
-own process; and a React client.`,
+own process; and a React client.
+
+Python, advanced: the same shop in Python. A Starlette quanar with the same
+managers, quans that declare themselves with dataclasses, each in its own
+Python process, and the React client.`,
 		example: `  qu new examples
   qu new examples shop --lang react-ts --example advanced --dir .
-  qu new examples shop --lang node-ts --example advanced --dir .`,
+  qu new examples shop --lang node-ts --example advanced --dir .
+  qu new examples shop --lang python --example advanced --dir .`,
 	},
 }
 
@@ -375,7 +380,7 @@ func createSingle(cmd *cobra.Command, a wizard.Answers, st createpkg.Stack) erro
 			fmt.Fprintf(out, "   cd %s && %s%s\n", target, strings.Join(start, " "), comment)
 		}
 	case quanarch.Qua:
-		fmt.Fprintf(out, " Built into %s. Link it from a quanar and its quans.\n", filepath.Join(target, "dist"))
+		fmt.Fprintf(out, " Link %s from a quanar and its quans.\n", target)
 	}
 	for _, note := range res.Notes {
 		fmt.Fprintf(out, "\n ! %s\n", note)

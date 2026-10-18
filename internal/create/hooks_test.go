@@ -47,6 +47,7 @@ const demoHooks = `on quan insert src/list.txt "// qu:quans" "[[ .Name ]] :[[ .P
 on qua insert src/core.txt "// qu:cores" {
 	line "core [[ .Name ]] {"
 	line "  from [[ .Dependency ]]"
+	line "  path [[ (index .Quas 0).Path ]]"
 	line "}"
 }
 `
@@ -107,7 +108,7 @@ func TestNewQuanIsTakenInTheWayTheStackSays(t *testing.T) {
 	if res.Port != 5003 || len(res.Wired) != 1 || len(res.Registered) != 1 {
 		t.Errorf("result = %+v", res)
 	}
-	if got := read(t, filepath.Join(quanar, "src", "core.txt")); got != "cores:\ncore ship-qua {\n  from file:../packages/ship-qua\n}\n// qu:cores\n" {
+	if got := read(t, filepath.Join(quanar, "src", "core.txt")); got != "cores:\ncore ship-qua {\n  from file:../packages/ship-qua\n  path ../packages/ship-qua\n}\n// qu:cores\n" {
 		t.Errorf("core.txt = %q", got)
 	}
 	if got := read(t, filepath.Join(quanar, "conf.qu")); !strings.HasSuffix(got, "qua acme-qua@1\nqua ship-qua@1\n") {

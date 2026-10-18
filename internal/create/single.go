@@ -190,11 +190,13 @@ func takeIn(st Stack, host string, s Single, data render.Data, run bool, out io.
 	for _, q := range data.Quas {
 		dep := q.Dependency
 		if q.Path != "" {
+			// From here on the qua is seen from the host, not from the new quan.
 			rel, err := filepath.Rel(host, filepath.Join(s.Target, filepath.FromSlash(q.Path)))
 			if err != nil {
 				return err
 			}
-			dep = "file:" + filepath.ToSlash(rel)
+			q.Path = filepath.ToSlash(rel)
+			dep = "file:" + q.Path
 		}
 		q.Dependency = dep
 		quas = append(quas, q)

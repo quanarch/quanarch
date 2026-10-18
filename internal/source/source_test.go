@@ -17,6 +17,7 @@ func TestParseSpec(t *testing.T) {
 		{"react-ts", Spec{Location: Registry["react-ts"]}},
 		{"react-ts@1", Spec{Location: Registry["react-ts"], Version: "1"}},
 		{"node-ts", Spec{Location: Registry["node-ts"]}},
+		{"python", Spec{Location: Registry["python"]}},
 		{"github.com/acme/stack", Spec{Location: "https://github.com/acme/stack"}},
 		{"github.com/acme/stack@1.2", Spec{Location: "https://github.com/acme/stack", Version: "1.2"}},
 		{"https://git.acme.dev/stack.git@2.0.0", Spec{Location: "https://git.acme.dev/stack.git", Version: "2.0.0"}},

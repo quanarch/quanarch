@@ -38,7 +38,7 @@ var Languages = []Language{
 	{ID: "svelte-ts", Name: "Svelte · TypeScript"},
 	{ID: "react-native", Name: "React Native · TypeScript"},
 	{ID: "node-ts", Name: "Node.js · TypeScript", Available: true},
-	{ID: "python", Name: "Python"},
+	{ID: "python", Name: "Python", Available: true},
 	{ID: "go", Name: "Go"},
 	{ID: "rust", Name: "Rust"},
 	{ID: "java", Name: "Java · Spring"},
@@ -69,6 +69,9 @@ var ExamplesByLanguage = map[string][]Example{
 	},
 	"node-ts": {
 		{ID: "advanced", Name: "Advanced", Summary: "full-stack shop: quanar server, qua, three quans talking by events, React client", Available: true},
+	},
+	"python": {
+		{ID: "advanced", Name: "Advanced", Summary: "full-stack shop: Starlette quanar, qua, three quans talking by events, React client", Available: true},
 	},
 }
 
