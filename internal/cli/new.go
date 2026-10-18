@@ -375,7 +375,7 @@ func createSingle(cmd *cobra.Command, a wizard.Answers, st createpkg.Stack) erro
 			fmt.Fprintf(out, "   cd %s && %s%s\n", target, strings.Join(start, " "), comment)
 		}
 	case quanarch.Qua:
-		fmt.Fprintf(out, " Built into %s. Link it from a quanar and its quans.\n", filepath.Join(target, "dist"))
+		fmt.Fprintf(out, " Link %s from a quanar and its quans.\n", target)
 	}
 	for _, note := range res.Notes {
 		fmt.Fprintf(out, "\n ! %s\n", note)
