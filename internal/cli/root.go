@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/quanarch/quanarch/internal/banner"
 	"github.com/quanarch/quanarch/internal/version"
 	"github.com/quanarch/quanarch/internal/wizard"
 )
@@ -38,9 +39,15 @@ func init() {
 
 func newRootCmd(name string) *cobra.Command {
 	root := &cobra.Command{
-		Use:           name,
-		Short:         "Create quanars, quans, quas and qmocks",
-		Long:          "Quanarch is an architecture style built on three concepts: quan, quanar and qua.\nLearn more at https://quanarch.org",
+		Use:   name,
+		Short: "Create Quanarch projects, quanars, quans, quas and qmocks",
+		Long: banner.Text(version.Label()) + `
+Run qu alone to be asked step by step, or say everything in one command:
+
+  qu new <kind> [name] [flags]
+
+Every command explains itself: "qu new --help", then "qu new <kind> --help".
+Learn more at https://quanarch.org`,
 		Version:       version.String(),
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
@@ -50,7 +57,7 @@ func newRootCmd(name string) *cobra.Command {
 			if !wizard.IsInteractive() {
 				return cmd.Help()
 			}
-			return runWizard(cmd, wizard.Preset{})
+			return runNew(cmd, wizard.Preset{})
 		},
 	}
 	root.SetVersionTemplate("{{.Name}} {{.Version}}\n")

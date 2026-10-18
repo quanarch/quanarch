@@ -33,6 +33,7 @@ template quanar ./templates/quanar/
 			quanarch.Quan:   {Kind: quanarch.Quan, Dir: "templates/quan", Run: [][]string{{"npm", "install"}, {"git", "init"}}},
 			quanarch.Quanar: {Kind: quanarch.Quanar, Dir: "templates/quanar"},
 		},
+		Examples: map[string]Template{},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %+v\nwant %+v", got, want)
@@ -75,5 +76,22 @@ func TestLoadManifest(t *testing.T) {
 	m, err := LoadManifest(dir)
 	if err != nil || m.Templates[quanarch.Qua].Dir != "t" {
 		t.Fatalf("LoadManifest = %+v, %v", m, err)
+	}
+}
+
+func TestDecodeExamples(t *testing.T) {
+	src := "stack s\ntemplate quan t\nexample advanced examples/advanced {\n\trun npm install\n}\n"
+	m, err := DecodeManifest(strings.NewReader(src), ManifestFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ex, ok := m.Examples["advanced"]
+	if !ok || ex.Dir != "examples/advanced" || len(ex.Run) != 1 {
+		t.Fatalf("examples = %+v", m.Examples)
+	}
+	for _, bad := range []string{"example x\n", "example Bad dir\n", "example a ../x\n", "example a d\nexample a e\n"} {
+		if _, err := DecodeManifest(strings.NewReader("stack s\n"+bad), ManifestFile); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
 	}
 }

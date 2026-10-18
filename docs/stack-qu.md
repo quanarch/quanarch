@@ -26,6 +26,8 @@ template quan templates/quan {
 template qmock templates/quanar {
 	run npm install
 }
+
+example advanced examples/advanced
 ```
 
 ## Directives
@@ -36,6 +38,7 @@ template qmock templates/quanar {
 | `version <version>` | The stack's version. |
 | `title <text>` | A human-readable name shown in prompts. |
 | `template <kind> <dir> [{ ... }]` | The template directory for `project`, `quanar`, `quan`, `qua` or `qmock`, relative to the stack root. Two kinds may share a directory; templates can tell them apart with `.Kind`. |
+| `example <id> <dir> [{ ... }]` | A complete example application, offered under *examples* in `qu`. The directory is rendered as a whole into the new project folder. |
 | `run <command> [args...]` | Inside a `template` block. A command run in the new project after it is created. Commands run in order, without a shell. |
 
 ## Templates
