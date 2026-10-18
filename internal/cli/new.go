@@ -72,14 +72,16 @@ func runWizard(cmd *cobra.Command, preset wizard.Preset) error {
 
 func create(cmd *cobra.Command, a wizard.Answers) error {
 	out := cmd.OutOrStdout()
-	if a.Kind != quanarch.Project {
-		fmt.Fprintf(out, " Creating a single %s is not connected yet; choose project to create files.\n\n", a.Kind)
+	if a.Kind == wizard.Examples {
+		fmt.Fprintf(out, " The %s example is not available yet.\n\n", a.Example.Name)
 		return nil
 	}
-
 	st, err := resolveStack(cmd, a.Language)
 	if err != nil {
 		return err
+	}
+	if a.Kind != quanarch.Project {
+		return createSingle(cmd, a, st)
 	}
 	p := createpkg.Project{Dir: a.Dir, Name: a.Name, Qua: a.Qua, Quanar: a.Quanar, Quan: a.Quan}
 	if err := createpkg.NewProject(p, st, true, out); err != nil {
@@ -90,6 +92,42 @@ func create(cmd *cobra.Command, a wizard.Answers) error {
 	fmt.Fprintf(out, "   cd %s && npm run watch\n", filepath.Join(a.Name, "quans", a.Quan))
 	fmt.Fprintf(out, "   cd %s && npm run dev\n\n", filepath.Join(a.Name, "quanar"))
 	fmt.Fprintf(out, " Then open http://localhost:5173/%s\n\n", a.Quan)
+	return nil
+}
+
+func createSingle(cmd *cobra.Command, a wizard.Answers, st createpkg.Stack) error {
+	out := cmd.OutOrStdout()
+	target := a.Target()
+	res, err := createpkg.NewSingle(createpkg.Single{Kind: a.Kind, Name: a.Name, Target: target, Qua: a.QuaSource}, st, true, out)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "\n Done.\n\n")
+	switch a.Kind {
+	case quanarch.Quan:
+		fmt.Fprintf(out, "   cd %s && npm run watch    # serves the quan on port %d\n\n", target, res.Port)
+		for _, file := range res.Registered {
+			fmt.Fprintf(out, " Added to %s\n", file)
+		}
+		for _, host := range res.Wired {
+			fmt.Fprintf(out, " Plugged its qua into %s\n", host)
+		}
+		if len(res.Registered) == 0 {
+			fmt.Fprintf(out, " Add it to your quanar's quan list:\n   { name: '%s', url: 'http://localhost:%d/%s.js' }\n", a.Name, res.Port, a.Name)
+		}
+	case quanarch.Quanar, quanarch.Qmock:
+		fmt.Fprintf(out, "   cd %s && npm run dev    # http://localhost:%d\n", target, res.Port)
+	case quanarch.Qua:
+		fmt.Fprintf(out, " Built into %s. Link it from a quanar and its quans.\n", filepath.Join(target, "dist"))
+	}
+	for _, note := range res.Notes {
+		fmt.Fprintf(out, "\n ! %s\n", note)
+	}
+	if needsQua := a.Kind != quanarch.Qua; needsQua && a.QuaSource.From == createpkg.NoQua {
+		fmt.Fprintf(out, "\n It has no qua yet: it cannot talk to a quanar until one is added. See its README.\n")
+	}
+	fmt.Fprintln(out)
 	return nil
 }
 

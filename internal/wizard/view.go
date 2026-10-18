@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/quanarch/quanarch/internal/create"
 	"github.com/quanarch/quanarch/internal/quanarch"
 )
 
@@ -56,6 +57,14 @@ func (m Model) question(s step) string {
 		return "Quanar name?"
 	case stepQuanName:
 		return "Quan name?"
+	case stepQua:
+		return "Which qua should it use?"
+	case stepNewQua:
+		return "New qua name?"
+	case stepQuaSpec:
+		return "Which published qua?"
+	case stepExample:
+		return "Which example?"
 	case stepConfirm:
 		return "Create it?"
 	}
@@ -79,6 +88,10 @@ func (m Model) answer(s step) string {
 		return kindStyle(quanarch.Quanar).Render(m.answers.Quanar)
 	case stepQuanName:
 		return kindStyle(quanarch.Quan).Render(m.answers.Quan)
+	case stepQua, stepNewQua, stepQuaSpec:
+		return kindStyle(quanarch.Qua).Render(m.quaSummary())
+	case stepExample:
+		return styleAccent.Render(m.answers.Example.Name)
 	}
 	return ""
 }
@@ -134,16 +147,16 @@ func (m Model) body(s step) string {
 	switch s {
 	case stepKind:
 		width := 0
-		for _, k := range quanarch.Kinds {
+		for _, k := range menu {
 			width = max(width, len(k))
 		}
-		for i, k := range quanarch.Kinds {
+		for i, k := range menu {
 			pointer, name := "  ", string(k)
 			if i == m.kindCursor {
 				pointer = styleAccent.Render("❯ ")
 			}
 			fmt.Fprintf(&b, "   %s%s %s  %s\n", pointer, kindStyle(k).Render("●"),
-				kindStyle(k).Render(fmt.Sprintf("%-*s", width, name)), styleDim.Render(k.Summary()))
+				kindStyle(k).Render(fmt.Sprintf("%-*s", width, name)), styleDim.Render(menuSummary(k)))
 		}
 
 	case stepLanguage:
@@ -175,7 +188,49 @@ func (m Model) body(s step) string {
 			b.WriteString("   " + styleDim.Render(dir) + "\n")
 		}
 
-	case stepName, stepQuaName, stepQuanarName, stepQuanName:
+	case stepExample:
+		list := m.examples()
+		if len(list) == 0 {
+			b.WriteString("   " + styleDim.Render("No examples for "+m.answers.Language.Name+" yet.") + "\n")
+			break
+		}
+		width := 0
+		for _, ex := range list {
+			width = max(width, lipgloss.Width(ex.Name))
+		}
+		for i, ex := range list {
+			pointer, name := "  ", ex.Name+strings.Repeat(" ", width-lipgloss.Width(ex.Name))
+			summary := ex.Summary
+			if !ex.Available {
+				summary += "  · soon"
+			}
+			switch {
+			case !ex.Available:
+				name = styleDim.Render(name)
+			case i == m.exCursor:
+				name = styleAccent.Render(name)
+			}
+			if i == m.exCursor {
+				pointer = styleAccent.Render("❯ ")
+			}
+			fmt.Fprintf(&b, "   %s%s  %s\n", pointer, name, styleDim.Render(summary))
+		}
+
+	case stepQua:
+		width := 0
+		for _, o := range m.quaOptions {
+			width = max(width, lipgloss.Width(o.label))
+		}
+		for i, o := range m.quaOptions {
+			pointer, label := "  ", o.label+strings.Repeat(" ", width-lipgloss.Width(o.label))
+			if i == m.quaCursor {
+				pointer = styleAccent.Render("❯ ")
+				label = styleAccent.Render(label)
+			}
+			fmt.Fprintf(&b, "   %s%s  %s\n", pointer, label, styleDim.Render(o.hint))
+		}
+
+	case stepName, stepQuaName, stepQuanarName, stepQuanName, stepNewQua, stepQuaSpec:
 		b.WriteString("   " + styleAccent.Render("› ") + m.names[s].View() + "\n")
 		b.WriteString("   " + styleDim.Render(m.nameHint(s)) + "\n")
 
@@ -202,6 +257,10 @@ func (m Model) nameHint(s step) string {
 		return "the host, created in quanar/"
 	case stepQuanName:
 		return "the first quan, created in quans/"
+	case stepNewQua:
+		return "created in the project's packages/ and linked"
+	case stepQuaSpec:
+		return "name@version or name@url, for example acme-qua@^1.0.0"
 	}
 	return "lowercase letters, digits and dashes"
 }
@@ -219,6 +278,9 @@ func (m Model) summary() string {
 			label("Quan")+kindStyle(quanarch.Quan).Render(m.answers.Quan)+styleDim.Render("    quans/"+m.answers.Quan),
 		)
 	}
+	if needsQua(m.answers.Kind) {
+		rows = append(rows, label("Qua")+kindStyle(quanarch.Qua).Render(m.quaSummary()))
+	}
 	rows = append(rows,
 		label("Language")+m.answers.Language.Name,
 		label("Location")+m.answers.Target(),
@@ -232,10 +294,37 @@ func (m Model) help(s step) string {
 		back = "esc cancel"
 	}
 	switch s {
-	case stepKind, stepLanguage:
+	case stepKind, stepLanguage, stepExample, stepQua:
 		return "↑/↓ move · enter select · " + back + " · ctrl+c quit"
 	case stepConfirm:
 		return "←/→ choose · enter confirm · " + back + " · ctrl+c quit"
 	}
 	return "enter continue · " + back + " · ctrl+c quit"
+}
+
+// quaSummary describes the chosen qua in a few words.
+func (m Model) quaSummary() string {
+	q := m.answers.QuaSource
+	switch q.From {
+	case create.LocalQua:
+		return q.Name + " (linked from packages/)"
+	case create.NewQua:
+		if q.Name == "" {
+			return "a new qua"
+		}
+		return q.Name + " (new, in packages/)"
+	case create.PublishedQua:
+		if q.Name == "" {
+			return "a published qua"
+		}
+		return q.Name + "@" + q.Spec
+	}
+	return "none for now"
+}
+
+func menuSummary(k quanarch.Kind) string {
+	if k == Examples {
+		return "complete applications to learn from or start with"
+	}
+	return k.Summary()
 }

@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/quanarch/quanarch/internal/create"
 	"github.com/quanarch/quanarch/internal/quanarch"
 )
 
@@ -51,6 +52,7 @@ func TestFullFlow(t *testing.T) {
 	m = press(t, m, "apps", "enter")  // location
 	m = press(t, m, "billing-report") // name
 	m = press(t, m, "enter")
+	m = press(t, m, "down", "enter") // qua: none for now (outside a project: published, none)
 	if m.current() != stepConfirm {
 		t.Fatalf("expected confirm, at %d err=%q", m.current(), m.err)
 	}
@@ -61,7 +63,7 @@ func TestFullFlow(t *testing.T) {
 	if !m.Done() {
 		t.Fatal("not done after confirming")
 	}
-	want := Answers{Kind: quanarch.Quan, Language: Languages[0], Dir: filepath.Join(cwd, "apps"), Name: "billing-report"}
+	want := Answers{Kind: quanarch.Quan, Language: Languages[0], Dir: filepath.Join(cwd, "apps"), Name: "billing-report", QuaSource: create.QuaSource{From: create.NoQua}}
 	if m.Answers() != want {
 		t.Errorf("answers = %+v, want %+v", m.Answers(), want)
 	}
@@ -72,10 +74,11 @@ func TestFullFlow(t *testing.T) {
 
 func TestPresetSkipsSteps(t *testing.T) {
 	m := New(Preset{Kind: quanarch.Qmock, Name: "dev"}, t.TempDir(), "v0")
-	if len(m.steps) != 3 || m.current() != stepLanguage {
+	if len(m.steps) != 4 || m.current() != stepLanguage {
 		t.Fatalf("steps = %v", m.steps)
 	}
 	m = press(t, m, "enter", "enter") // language, current folder
+	m = press(t, m, "down", "enter")  // no qua
 	if m.current() != stepConfirm || m.answers.Name != "dev" {
 		t.Fatalf("at %d, answers %+v", m.current(), m.answers)
 	}
@@ -135,7 +138,7 @@ func TestExistingFolderIsRefused(t *testing.T) {
 
 func TestDeclining(t *testing.T) {
 	m := New(Preset{Kind: quanarch.Quan, Name: "x"}, t.TempDir(), "v0")
-	m = press(t, m, "enter", "enter", "left", "enter")
+	m = press(t, m, "enter", "enter", "down", "enter", "left", "enter")
 	if m.Done() || !m.cancelled {
 		t.Fatal("declining did not cancel")
 	}
@@ -174,5 +177,91 @@ func TestProjectAsksForEveryName(t *testing.T) {
 	want := Answers{Kind: quanarch.Project, Language: Languages[0], Dir: cwd, Name: "acme", Qua: "acme-qua", Quanar: "acme-quanar", Quan: "billing"}
 	if !m.Done() || m.Answers() != want {
 		t.Errorf("answers = %+v", m.Answers())
+	}
+}
+
+// newProjectDir lays out a project root with one qua, as qu creates it.
+func newProjectDir(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for rel, content := range map[string]string{
+		"conf.qu":                   "project acme\n",
+		"packages/acme-qua/conf.qu": "qua acme-qua\nversion 1\n",
+	} {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+func TestQuanInsideProjectUsesItsQua(t *testing.T) {
+	root := newProjectDir(t)
+	m := New(Preset{Kind: quanarch.Quan, Name: "invoices"}, root, "v0")
+	m = press(t, m, "enter", "enter") // language, project root
+	labels := []string{}
+	for _, o := range m.quaOptions {
+		labels = append(labels, o.label)
+	}
+	if strings.Join(labels, "|") != "acme-qua|Create a new qua|Use a published qua|No qua for now" {
+		t.Fatalf("options = %v", labels)
+	}
+	m = press(t, m, "enter", "enter") // acme-qua, confirm
+	a := m.Answers()
+	if !m.Done() || a.Target() != filepath.Join(root, "quans", "invoices") {
+		t.Fatalf("target = %s", a.Target())
+	}
+	if a.QuaSource.From != create.LocalQua || a.QuaSource.Dir != filepath.Join(root, "packages", "acme-qua") {
+		t.Errorf("qua = %+v", a.QuaSource)
+	}
+}
+
+func TestCreatingANewQuaAsksItsName(t *testing.T) {
+	root := newProjectDir(t)
+	m := New(Preset{Kind: quanarch.Quan, Name: "invoices"}, root, "v0")
+	m = press(t, m, "enter", "enter", "down", "enter") // create a new qua
+	if m.current() != stepNewQua {
+		t.Fatalf("at %d", m.current())
+	}
+	m = press(t, m, "acme-qua", "enter")
+	if !strings.Contains(m.err, "not empty") {
+		t.Fatalf("an existing qua folder was accepted: err=%q", m.err)
+	}
+	m = press(t, m, "ctrl+u", "billing-qua", "enter", "enter")
+	if !m.Done() || m.Answers().QuaSource != (create.QuaSource{From: create.NewQua, Name: "billing-qua"}) {
+		t.Fatalf("qua = %+v", m.Answers().QuaSource)
+	}
+}
+
+func TestPublishedQua(t *testing.T) {
+	m := New(Preset{Kind: quanarch.Quanar, Name: "host"}, t.TempDir(), "v0")
+	m = press(t, m, "enter", "enter", "enter") // language, folder, published
+	m = press(t, m, "Bad Name", "enter")
+	if !strings.Contains(m.err, "kebab-case") {
+		t.Fatalf("err = %q", m.err)
+	}
+	m = press(t, m, "ctrl+u", "acme-qua@^1.2.0", "enter", "enter")
+	if !m.Done() || m.Answers().QuaSource != (create.QuaSource{From: create.PublishedQua, Name: "acme-qua", Spec: "^1.2.0"}) {
+		t.Fatalf("qua = %+v", m.Answers().QuaSource)
+	}
+}
+
+func TestExamplesAsksForLanguageThenExample(t *testing.T) {
+	m := New(Preset{}, t.TempDir(), "v0")
+	m = press(t, m, "up", "enter") // examples is the last entry
+	if m.answers.Kind != Examples || m.current() != stepLanguage {
+		t.Fatalf("kind=%s at %d", m.answers.Kind, m.current())
+	}
+	m = press(t, m, "enter") // React · TypeScript
+	if m.current() != stepExample || !strings.Contains(m.View(), "Advanced") {
+		t.Fatalf("at %d:\n%s", m.current(), m.View())
+	}
+	m = press(t, m, "enter")
+	if m.current() != stepExample || !strings.Contains(m.err, "coming soon") {
+		t.Fatalf("an unavailable example was accepted: at %d err=%q", m.current(), m.err)
 	}
 }
