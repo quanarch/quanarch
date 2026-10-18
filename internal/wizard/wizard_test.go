@@ -268,3 +268,21 @@ func TestExamplesAsksForLanguageThenExample(t *testing.T) {
 		t.Errorf("summary:\n%s", m.View())
 	}
 }
+
+func TestUnreleasedLanguageWithAStackDir(t *testing.T) {
+	var lang Language
+	for _, l := range Languages {
+		if !l.Available {
+			lang = l
+			break
+		}
+	}
+	a := Answers{Kind: quanarch.Qua, Name: "acme-qua", Language: lang}
+	if err := Validate(a); err == nil || !strings.Contains(err.Error(), "coming soon") {
+		t.Fatalf("an unreleased language was accepted: %v", err)
+	}
+	t.Setenv("QU_STACK_DIR", t.TempDir())
+	if err := Validate(a); err != nil {
+		t.Errorf("with QU_STACK_DIR: %v", err)
+	}
+}

@@ -135,3 +135,14 @@ stack [[ .Stack ]]@[[ .StackVersion ]]
 qua [[ .Name ]][[ if .Version ]]@[[ .Version ]][[ end ]]
 [[- end ]]
 ```
+
+## Developing a stack
+
+`qu` fetches a stack from its repository's latest release tag. To use a stack on disk
+instead, point `QU_STACK_DIR` at it:
+
+```sh
+QU_STACK_DIR=../quanarch-node qu new project acme --lang node-ts --dir . --qua acme-qua --quanar acme-quanar --quan billing
+```
+
+With `QU_STACK_DIR` set, a language whose stack is not released yet can be chosen too.
