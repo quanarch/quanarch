@@ -75,7 +75,7 @@ homebrew_casks:
     repository:
       owner: quanarch
       name: homebrew-tap
-      token: '{{ index .Env "TAP_GITHUB_TOKEN" }}'
+      token: '{{ .Env.TAP_GITHUB_TOKEN }}'
     homepage: https://quanarch.org
     description: Create Quanarch projects, quanars, quans, quas and qmocks.
     license: Apache-2.0
@@ -93,7 +93,7 @@ scoops:
     repository:
       owner: quanarch
       name: scoop-bucket
-      token: '{{ index .Env "TAP_GITHUB_TOKEN" }}'
+      token: '{{ .Env.TAP_GITHUB_TOKEN }}'
     homepage: https://quanarch.org
     description: Create Quanarch projects, quanars, quans, quas and qmocks.
     license: Apache-2.0
