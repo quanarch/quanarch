@@ -7,6 +7,11 @@ on:
 permissions:
   contents: write
 
+env:
+  NEXUS_URL: https://repo.relteco.com/repository
+  APT_REPO: apt-relteco
+  YUM_REPO: yum-relteco
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -18,9 +23,38 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test ./...
+
+      # Archives and Linux packages go to GitHub Releases. The Homebrew tap, the
+      # Scoop bucket and the AUR are updated when their secrets are set.
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: '~> v2'
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          AUR_KEY: ${{ secrets.AUR_KEY }}
+
+      # apt install quanarch / dnf install quanarch, from the Nexus repositories.
+      - name: Upload packages to the apt and yum repositories
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_PUBLISH_USERNAME || vars.NEXUS_PUBLISH_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PUBLISH_PASSWORD || vars.NEXUS_PUBLISH_PASSWORD }}
+        run: |
+          if [ -z "$NEXUS_USERNAME" ] || [ -z "$NEXUS_PASSWORD" ]; then
+            echo "::notice::Nexus credentials are not set; skipping apt and yum."
+            exit 0
+          fi
+          upload() { curl -fsS -u "$NEXUS_USERNAME:$NEXUS_PASSWORD" "$@"; }
+          # A failed upload warns instead of failing the release: the archives
+          # and the other channels are already published at this point.
+          for f in dist/*.deb; do
+            echo "apt ← $f"
+            upload -H "Content-Type: multipart/form-data" --data-binary "@$f" "$NEXUS_URL/$APT_REPO/" \
+              || echo "::warning::could not upload $f to $APT_REPO"
+          done
+          for f in dist/*.rpm; do
+            echo "yum ← $f"
+            upload -T "$f" "$NEXUS_URL/$YUM_REPO/$(basename "$f")" \
+              || echo "::warning::could not upload $f to $YUM_REPO"
+          done

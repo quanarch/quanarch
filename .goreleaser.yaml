@@ -28,7 +28,8 @@ builds:
     binary: qu
 
 archives:
-  - ids: [quanarch, qu]
+  - id: default
+    ids: [quanarch, qu]
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     formats: [tar.gz]
     format_overrides:
@@ -50,3 +51,67 @@ changelog:
       - '^Merge '
       - '^docs:'
       - '^chore:'
+
+# Linux packages, attached to every release and uploaded to the apt and yum
+# repositories by the release workflow.
+nfpms:
+  - id: packages
+    package_name: quanarch
+    ids: [quanarch, qu]
+    vendor: Relteco
+    homepage: https://quanarch.org
+    maintainer: Can Berk Coşar <info@relteco.com>
+    description: Create Quanarch projects, quanars, quans, quas and qmocks.
+    license: Apache-2.0
+    formats: [deb, rpm, apk, archlinux]
+    bindir: /usr/bin
+    file_name_template: '{{ .ConventionalFileName }}'
+
+# brew install quanarch/tap/quanarch (macOS and Linux)
+homebrew_casks:
+  - name: quanarch
+    ids: [default]
+    binaries: [quanarch, qu]
+    repository:
+      owner: quanarch
+      name: homebrew-tap
+      token: '{{ index .Env "TAP_GITHUB_TOKEN" }}'
+    homepage: https://quanarch.org
+    description: Create Quanarch projects, quanars, quans, quas and qmocks.
+    license: Apache-2.0
+    skip_upload: '{{ if not (index .Env "TAP_GITHUB_TOKEN") }}true{{ end }}'
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/quanarch", "#{staged_path}/qu"]
+          end
+
+# scoop bucket add quanarch https://github.com/quanarch/scoop-bucket; scoop install quanarch
+scoops:
+  - name: quanarch
+    repository:
+      owner: quanarch
+      name: scoop-bucket
+      token: '{{ index .Env "TAP_GITHUB_TOKEN" }}'
+    homepage: https://quanarch.org
+    description: Create Quanarch projects, quanars, quans, quas and qmocks.
+    license: Apache-2.0
+    skip_upload: '{{ if not (index .Env "TAP_GITHUB_TOKEN") }}true{{ end }}'
+
+# yay -S quanarch-bin
+aurs:
+  - name: quanarch-bin
+    homepage: https://quanarch.org
+    description: Create Quanarch projects, quanars, quans, quas and qmocks.
+    maintainers: ['Can Berk Coşar <info@relteco.com>']
+    license: Apache-2.0
+    private_key: '{{ index .Env "AUR_KEY" }}'
+    git_url: ssh://aur@aur.archlinux.org/quanarch-bin.git
+    skip_upload: '{{ if not (index .Env "AUR_KEY") }}true{{ end }}'
+    provides: [quanarch]
+    conflicts: [quanarch]
+    package: |
+      install -Dm755 ./quanarch "${pkgdir}/usr/bin/quanarch"
+      install -Dm755 ./qu "${pkgdir}/usr/bin/qu"
+      install -Dm644 ./LICENSE "${pkgdir}/usr/share/licenses/quanarch/LICENSE"
