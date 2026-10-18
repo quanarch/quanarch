@@ -218,6 +218,11 @@ func takeIn(st Stack, host string, s Single, data render.Data, run bool, out io.
 
 	quanData := data
 	quanData.Quas = quas
+	rel, err := filepath.Rel(host, s.Target)
+	if err != nil {
+		return err
+	}
+	quanData.Quans = []render.Quan{{Name: s.Name, Port: data.Port, Path: filepath.ToSlash(rel)}}
 	changed, err := applyHooks(st, quanarch.Quan, host, quanData, run, out)
 	if err != nil {
 		res.Notes = append(res.Notes, hookNote(err, fmt.Sprintf("add %s, served on port %d, to %s", s.Name, data.Port, host)))

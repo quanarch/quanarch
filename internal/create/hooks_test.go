@@ -43,7 +43,7 @@ func hookStack(t *testing.T, hooks string) Stack {
 	return Stack{Dir: dir, Manifest: m}
 }
 
-const demoHooks = `on quan insert src/list.txt "// qu:quans" "[[ .Name ]] :[[ .Port ]] [[ range .Quas ]][[ .Name ]][[ end ]]"
+const demoHooks = `on quan insert src/list.txt "// qu:quans" "[[ .Name ]] :[[ .Port ]] [[ range .Quas ]][[ .Name ]][[ end ]] at [[ (index .Quans 0).Path ]]"
 on qua insert src/core.txt "// qu:cores" {
 	line "core [[ .Name ]] {"
 	line "  from [[ .Dependency ]]"
@@ -92,7 +92,7 @@ func TestNewQuanIsTakenInTheWayTheStackSays(t *testing.T) {
 	if res.Port != 5002 || len(res.Registered) != 1 || len(res.Wired) != 0 || len(res.Notes) != 0 {
 		t.Errorf("result = %+v", res)
 	}
-	if got := read(t, filepath.Join(quanar, "src", "list.txt")); got != "quans:\n  stock :5002 acme-qua\n  // qu:quans\n" {
+	if got := read(t, filepath.Join(quanar, "src", "list.txt")); got != "quans:\n  stock :5002 acme-qua at ../quans/stock\n  // qu:quans\n" {
 		t.Errorf("list.txt = %q", got)
 	}
 	if got := read(t, filepath.Join(quanar, "src", "core.txt")); got != "cores:\n// qu:cores\n" {
@@ -128,7 +128,7 @@ func TestHooksAreNotAppliedTwice(t *testing.T) {
 			t.Errorf("round %d: changed=%v err=%v, want %v", i, changed, err, want)
 		}
 	}
-	if got := strings.Count(read(t, filepath.Join(quanar, "src", "list.txt")), "stock"); got != 1 {
+	if got := strings.Count(read(t, filepath.Join(quanar, "src", "list.txt")), "stock :5002"); got != 1 {
 		t.Errorf("stock is listed %d times", got)
 	}
 }
@@ -166,7 +166,8 @@ func TestStackWithoutHooksLeavesANote(t *testing.T) {
 }
 
 func renderData(name string, port int, qua string) render.Data {
-	return render.Data{Name: name, Kind: "quan", Port: port, Quas: []render.Qua{{Name: qua, Version: "1"}}}
+	return render.Data{Name: name, Kind: "quan", Port: port, Quas: []render.Qua{{Name: qua, Version: "1"}},
+		Quans: []render.Quan{{Name: name, Port: port, Path: "../quans/" + name}}}
 }
 
 func TestRenderCommand(t *testing.T) {

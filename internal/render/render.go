@@ -48,6 +48,9 @@ type Quan struct {
 	Name string
 	// Port is the port the quan is served on while it is developed.
 	Port int
+	// Path is the slash-separated path to the quan from the quanar or qmock a hook changes,
+	// for example "../quans/billing". Empty when the quan is not on disk next to it.
+	Path string
 }
 
 // Qua is a qua referenced by the new project.
