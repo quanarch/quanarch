@@ -48,21 +48,15 @@ type Single struct {
 
 // Result says what was created beyond the target itself.
 type Result struct {
-	// Port is the port a quan is served on, or the dev server port of a quanar or qmock.
+	// Port is the port a quan is served on, or the dev server port of a quanar or qmock; 0 if the stack does not say.
 	Port int
-	// Registered lists the files the new quan was added to.
+	// Registered lists the quanars and qmocks the new quan was added to.
 	Registered []string
 	// Wired lists the quanars and qmocks the new quan's qua was plugged into.
 	Wired []string
 	// Notes are things qu could not do itself and the user should.
 	Notes []string
 }
-
-// Dev server ports of a quanar and a qmock.
-const (
-	QuanarPort = 5173
-	QmockPort  = 5174
-)
 
 // NewSingle creates one item. Inside a project it links the project's quas,
 // takes the next free port and registers a new quan with the project's quanar.
@@ -92,16 +86,16 @@ func NewSingle(s Single, st Stack, run bool, out io.Writer) (Result, error) {
 
 	switch s.Kind {
 	case quanarch.Quan:
-		res.Port = project.FirstQuanPort
+		res.Port = st.Port(quanarch.Quan)
+		if res.Port == 0 {
+			res.Port = project.FirstQuanPort
+		}
 		if inProject {
-			res.Port = project.NextQuanPort(root)
+			res.Port = project.NextQuanPort(root, res.Port)
 		}
 		data.Port = res.Port
 	case quanarch.Quanar, quanarch.Qmock:
-		res.Port = QuanarPort
-		if s.Kind == quanarch.Qmock {
-			res.Port = QmockPort
-		}
+		res.Port = st.Port(s.Kind)
 		data.Port = res.Port
 		if inProject {
 			for _, q := range project.Quans(root) {
@@ -120,37 +114,8 @@ func NewSingle(s Single, st Stack, run bool, out io.Writer) (Result, error) {
 			if _, err := os.Stat(host); err != nil {
 				continue
 			}
-			file := filepath.Join(host, "src", "config", "index.ts")
-			ok, err := registerQuan(file, s.Name, res.Port)
-			if err != nil {
+			if err := takeIn(st, host, s, data, run, out, &res); err != nil {
 				return res, err
-			}
-			if ok {
-				res.Registered = append(res.Registered, file)
-			}
-			// The quan's qua must be plugged into every host that loads it.
-			for _, q := range data.Quas {
-				dep := q.Dependency
-				if q.Path != "" {
-					rel, err := filepath.Rel(host, filepath.Join(s.Target, filepath.FromSlash(q.Path)))
-					if err != nil {
-						return res, err
-					}
-					dep = "file:" + filepath.ToSlash(rel)
-				}
-				wired, err := wireQua(host, q.Name, dep)
-				if err != nil {
-					res.Notes = append(res.Notes, err.Error()+"; plug "+q.Name+" in by hand")
-					continue
-				}
-				if wired {
-					res.Wired = append(res.Wired, host)
-					if run {
-						if err := runSteps([][]string{{"npm", "install"}}, host, out); err != nil {
-							return res, err
-						}
-					}
-				}
 			}
 		}
 	}
@@ -217,23 +182,53 @@ func renderPart(kind quanarch.Kind, dst string, data render.Data, st Stack, run 
 	return runSteps(t.Run, dst, out)
 }
 
-// registerQuan adds a quan to a host's quan list, just before its closing bracket.
-// It reports false when the file does not exist or does not look as generated.
-func registerQuan(file, name string, port int) (bool, error) {
-	b, err := os.ReadFile(file)
+// takeIn adds a new quan to a quanar or qmock the way the stack declares: first its
+// quas the host does not have yet, then the quan itself. What cannot be done automatically
+// becomes a note.
+func takeIn(st Stack, host string, s Single, data render.Data, run bool, out io.Writer, res *Result) error {
+	var quas []render.Qua
+	for _, q := range data.Quas {
+		dep := q.Dependency
+		if q.Path != "" {
+			rel, err := filepath.Rel(host, filepath.Join(s.Target, filepath.FromSlash(q.Path)))
+			if err != nil {
+				return err
+			}
+			dep = "file:" + filepath.ToSlash(rel)
+		}
+		q.Dependency = dep
+		quas = append(quas, q)
+
+		if hasQua(host, q.Name) {
+			continue
+		}
+		quaData := render.Data{Name: q.Name, Kind: string(quanarch.Qua), Stack: data.Stack, StackVersion: data.StackVersion,
+			Project: data.Project, Version: q.Version, Dependency: dep, Quas: []render.Qua{q}}
+		if _, err := applyHooks(st, quanarch.Qua, host, quaData, run, out); err != nil {
+			res.Notes = append(res.Notes, hookNote(err, "plug "+q.Name+" into "+host))
+			continue
+		}
+		if err := addQuaToConf(host, conf.Ref{Name: q.Name, Version: q.Version}); err != nil {
+			return err
+		}
+		res.Wired = append(res.Wired, host)
+	}
+
+	quanData := data
+	quanData.Quas = quas
+	changed, err := applyHooks(st, quanarch.Quan, host, quanData, run, out)
 	if err != nil {
-		return false, nil
+		res.Notes = append(res.Notes, hookNote(err, fmt.Sprintf("add %s, served on port %d, to %s", s.Name, data.Port, host)))
+		return nil
 	}
-	src := string(b)
-	if strings.Contains(src, "name: '"+name+"'") {
-		return true, nil
+	if changed {
+		res.Registered = append(res.Registered, host)
 	}
-	end := strings.LastIndex(src, "\n];")
-	if end < 0 {
-		return false, nil
-	}
-	entry := fmt.Sprintf("\n  { name: '%s', url: 'http://localhost:%d/%s.js' },", name, port, name)
-	return true, os.WriteFile(file, []byte(src[:end]+entry+src[end:]), 0o644)
+	return nil
+}
+
+func hookNote(err error, todo string) string {
+	return err.Error() + "; " + todo + " by hand"
 }
 
 // NewExample writes a stack's example application to target.

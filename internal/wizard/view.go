@@ -376,7 +376,7 @@ func stepHelp(s step) string {
 	case stepNewQua:
 		return "The new qua is created in the project's packages/ and linked.\nCommand line: --new-qua <name>"
 	case stepQuaSpec:
-		return "An npm package with a version range, or a URL.\nCommand line: --qua acme-qua@^1.0.0"
+		return "A package from a registry with a version range, or a URL.\nCommand line: --qua acme-qua@^1.0.0"
 	case stepConfirm:
 		return "Nothing is written until you confirm. When a command answers every\nquestion, qu creates at once without asking."
 	}

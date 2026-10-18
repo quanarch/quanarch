@@ -163,3 +163,21 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Load on empty dir: %v, want not-exist error", err)
 	}
 }
+
+func TestDecodePort(t *testing.T) {
+	p, err := Decode(strings.NewReader("quan billing\nport 4002\n"), FileName)
+	if err != nil || p.Port != 4002 {
+		t.Fatalf("Decode = %+v, %v", p, err)
+	}
+	for src, want := range map[string]string{
+		"qua q\nport 1\n":            "a qua has no port",
+		"project p\nport 1\n":        "a project has no port",
+		"quan b\nport x\n":           `invalid port "x"`,
+		"quan b\nport 0\n":           `invalid port "0"`,
+		"quanar r\nport 1\nport 2\n": "port is already set on line 2",
+	} {
+		if _, err := Decode(strings.NewReader(src), FileName); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: err = %v, want %q", src, err, want)
+		}
+	}
+}

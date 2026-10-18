@@ -314,7 +314,7 @@ func (m Model) buildQuaOptions() []quaOption {
 		opts = append(opts, quaOption{label: "Create a new qua", hint: "in packages/", source: create.QuaSource{From: create.NewQua}})
 	}
 	opts = append(opts,
-		quaOption{label: "Use a published qua", hint: "an npm package or a URL", source: create.QuaSource{From: create.PublishedQua}},
+		quaOption{label: "Use a published qua", hint: "a package from a registry, or a URL", source: create.QuaSource{From: create.PublishedQua}},
 		quaOption{label: "No qua for now", hint: "its README will say one is needed", source: create.QuaSource{From: create.NoQua}},
 	)
 	return opts

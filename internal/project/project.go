@@ -14,7 +14,7 @@ import (
 	"github.com/quanarch/quanarch/internal/quanarch"
 )
 
-// FirstQuanPort is the port the first quan of a project is served on.
+// FirstQuanPort is the port the first quan of a project is served on when its stack does not say.
 const FirstQuanPort = 4001
 
 // FindRoot returns the root of the project dir belongs to: the nearest folder,
@@ -68,14 +68,21 @@ func Quans(root string) []Quan {
 		if err != nil || p.Kind != quanarch.Quan {
 			continue
 		}
-		quans = append(quans, Quan{Name: p.Name, Port: watchPort(dir), Dir: dir})
+		port := p.Port
+		if port == 0 {
+			port = legacyWatchPort(dir)
+		}
+		quans = append(quans, Quan{Name: p.Name, Port: port, Dir: dir})
 	}
 	return quans
 }
 
-// NextQuanPort returns a port no quan of the project uses yet.
-func NextQuanPort(root string) int {
-	port := FirstQuanPort
+// NextQuanPort returns a port no quan of the project uses yet, starting at first.
+func NextQuanPort(root string, first int) int {
+	port := first
+	if port == 0 {
+		port = FirstQuanPort
+	}
 	for _, q := range Quans(root) {
 		if q.Port >= port {
 			port = q.Port + 1
@@ -108,8 +115,10 @@ func Place(kind quanarch.Kind, dir, name string) string {
 	return filepath.Join(root, name)
 }
 
-// watchPort reads the port of a quan's watch script; 0 if there is none.
-func watchPort(dir string) int {
+// legacyWatchPort reads the port of a quan's watch script; 0 if there is none.
+// Quans write their port in conf.qu; this only finds the port of a quan created
+// by an older qu, from the npm script those stacks used.
+func legacyWatchPort(dir string) int {
 	b, err := os.ReadFile(filepath.Join(dir, "package.json"))
 	if err != nil {
 		return 0

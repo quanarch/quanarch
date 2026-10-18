@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/quanarch/quanarch/internal/project"
 	"github.com/quanarch/quanarch/internal/quanarch"
 	"github.com/quanarch/quanarch/internal/render"
 	"github.com/quanarch/quanarch/internal/stack"
@@ -38,9 +39,6 @@ type Project struct {
 	Quan   string
 }
 
-// QuanPort is the port the project's first quan is served on during development.
-const QuanPort = 4001
-
 // part is one piece of a project: what to render, where, and with which data.
 type part struct {
 	kind quanarch.Kind
@@ -56,12 +54,16 @@ func NewProject(p Project, st Stack, run bool, out io.Writer) error {
 		return []render.Qua{{Name: p.Qua, Version: "1", Path: path, Dependency: "file:" + path}}
 	}
 	common := render.Data{Stack: st.Manifest.Name, StackVersion: st.Manifest.Version, Project: p.Name}
+	quanPort := st.Port(quanarch.Quan)
+	if quanPort == 0 {
+		quanPort = project.FirstQuanPort
+	}
 
 	parts := []part{
 		{kind: quanarch.Project, dir: ".", data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Name, string(quanarch.Project)
 			d.Quas = quas("packages/" + p.Qua)
-			d.Quans = []render.Quan{{Name: p.Quan, Port: QuanPort}}
+			d.Quans = []render.Quan{{Name: p.Quan, Port: quanPort}}
 		})},
 		{kind: quanarch.Qua, dir: "packages/" + p.Qua, data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Qua, string(quanarch.Qua)
@@ -69,13 +71,13 @@ func NewProject(p Project, st Stack, run bool, out io.Writer) error {
 		{kind: quanarch.Quanar, dir: "quanar", data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Quanar, string(quanarch.Quanar)
 			d.Quas = quas("../packages/" + p.Qua)
-			d.Quans = []render.Quan{{Name: p.Quan, Port: QuanPort}}
-			d.Port = QuanarPort
+			d.Quans = []render.Quan{{Name: p.Quan, Port: quanPort}}
+			d.Port = st.Port(quanarch.Quanar)
 		})},
 		{kind: quanarch.Quan, dir: "quans/" + p.Quan, data: with(common, func(d *render.Data) {
 			d.Name, d.Kind = p.Quan, string(quanarch.Quan)
 			d.Quas = quas("../../packages/" + p.Qua)
-			d.Port = QuanPort
+			d.Port = quanPort
 		})},
 	}
 

@@ -8,9 +8,18 @@
 //
 //	template quan templates/quan {
 //		run npm install
+//		port 4001
+//		start npm run watch
 //	}
 //	template quanar templates/quanar
 //	template qua templates/qua
+//
+//	on quan insert src/config/index.ts "// qu:quans" "{ name: '[[ .Name ]]' },"
+//	on qua run npm install [[ .Dependency ]]
+//
+// The engine knows no language. Everything that depends on one, the ports, the
+// commands that start a part, and how a new quan or qua is added to a quanar,
+// is declared here by the stack.
 package stack
 
 import (
@@ -19,6 +28,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/quanarch/quanarch/internal/conf"
@@ -36,6 +46,24 @@ type Manifest struct {
 	Templates map[quanarch.Kind]Template
 	// Examples are complete applications, by ID.
 	Examples map[string]Template
+	// Hooks say how a quanar or qmock takes in a quan or a qua added to the project later.
+	Hooks []Hook
+}
+
+// Hook is one "on" directive: what to do in every quanar and qmock of a project
+// when a quan is added to it, or when a quan brings a qua they do not have yet.
+type Hook struct {
+	// Event is quan or qua.
+	Event quanarch.Kind
+	// File and Marker say where to insert: the lines go just above the line that holds
+	// exactly Marker. Both are empty for a hook that runs a command.
+	File   string
+	Marker string
+	// Lines are inserted, each one a template.
+	Lines []string
+	// Run is a command to run in the quanar or qmock, each argument a template.
+	Run  []string
+	Line int
 }
 
 // Template is the template a stack provides for one kind.
@@ -45,6 +73,11 @@ type Template struct {
 	Dir string
 	// Run lists commands to run in the new project after it is created.
 	Run [][]string
+	// Port is the port the part is served on while it is developed: a quanar's or
+	// qmock's server, a quan's watch. For a quan it is the first port of a project. 0 if not given.
+	Port int
+	// Start is the command that runs the part while it is developed. Empty if not given.
+	Start []string
 }
 
 // LoadManifest reads the stack.qu file in dir.
@@ -114,6 +147,13 @@ func DecodeManifest(r io.Reader, file string) (*Manifest, error) {
 			}
 			m.Templates[t.Kind] = t
 
+		case "on":
+			h, err := decodeHook(d, errorf)
+			if err != nil {
+				return nil, err
+			}
+			m.Hooks = append(m.Hooks, h)
+
 		case "example":
 			id, t, err := decodeExample(d, errorf)
 			if err != nil {
@@ -148,10 +188,14 @@ func decodeExample(d *conf.Directive, errorf func(int, string, ...any) error) (s
 	}
 	t := Template{Dir: dir}
 	for _, inner := range d.Block {
-		if inner.Name != "run" || inner.HasBlock || len(inner.Args) == 0 {
-			return "", Template{}, errorf(inner.Line, "only run commands are allowed inside an example")
+		switch {
+		case inner.Name == "run" && !inner.HasBlock && len(inner.Args) > 0:
+			t.Run = append(t.Run, inner.Args)
+		case inner.Name == "start" && !inner.HasBlock && len(inner.Args) > 0 && t.Start == nil:
+			t.Start = inner.Args
+		default:
+			return "", Template{}, errorf(inner.Line, "only run and one start are allowed inside an example")
 		}
-		t.Run = append(t.Run, inner.Args)
 	}
 	return d.Args[0], t, nil
 }
@@ -171,15 +215,110 @@ func decodeTemplate(d *conf.Directive, errorf func(int, string, ...any) error) (
 
 	t := Template{Kind: kind, Dir: dir}
 	for _, inner := range d.Block {
-		if inner.Name != "run" {
-			return Template{}, errorf(inner.Line, "only run is allowed inside a template, found %q", inner.Name)
+		switch inner.Name {
+		case "run":
+			if inner.HasBlock || len(inner.Args) == 0 {
+				return Template{}, errorf(inner.Line, "run takes a command, for example \"run npm install\"")
+			}
+			t.Run = append(t.Run, inner.Args)
+		case "port":
+			if t.Port != 0 {
+				return Template{}, errorf(inner.Line, "port is already set")
+			}
+			port, err := ParsePort(inner.Args)
+			if inner.HasBlock || err != nil {
+				return Template{}, errorf(inner.Line, "port takes one number between 1 and 65535, for example \"port 4001\"")
+			}
+			t.Port = port
+		case "start":
+			if t.Start != nil {
+				return Template{}, errorf(inner.Line, "start is already set")
+			}
+			if inner.HasBlock || len(inner.Args) == 0 {
+				return Template{}, errorf(inner.Line, "start takes a command, for example \"start npm run dev\"")
+			}
+			t.Start = inner.Args
+		default:
+			return Template{}, errorf(inner.Line, "only run, port and start are allowed inside a template, found %q", inner.Name)
 		}
-		if inner.HasBlock || len(inner.Args) == 0 {
-			return Template{}, errorf(inner.Line, "run takes a command, for example \"run npm install\"")
-		}
-		t.Run = append(t.Run, inner.Args)
 	}
 	return t, nil
+}
+
+// ParsePort reads a single port number.
+func ParsePort(args []string) (int, error) {
+	if len(args) != 1 {
+		return 0, fmt.Errorf("one port")
+	}
+	port, err := strconv.Atoi(args[0])
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid port %q", args[0])
+	}
+	return port, nil
+}
+
+// decodeHook reads one of
+//
+//	on quan|qua insert <file> <marker> <line>
+//	on quan|qua insert <file> <marker> {
+//		line <line>
+//		...
+//	}
+//	on quan|qua run <command...>
+func decodeHook(d *conf.Directive, errorf func(int, string, ...any) error) (Hook, error) {
+	usage := `on takes quan or qua, then "insert <file> <marker> <line>" or "run <command>"`
+	if len(d.Args) < 2 {
+		return Hook{}, errorf(d.Line, "%s", usage)
+	}
+	h := Hook{Line: d.Line}
+	switch d.Args[0] {
+	case string(quanarch.Quan), string(quanarch.Qua):
+		h.Event = quanarch.Kind(d.Args[0])
+	default:
+		return Hook{}, errorf(d.Line, "on: %q is not an event; use quan or qua", d.Args[0])
+	}
+
+	switch d.Args[1] {
+	case "run":
+		if d.HasBlock || len(d.Args) < 3 {
+			return Hook{}, errorf(d.Line, "on %s run takes a command", h.Event)
+		}
+		h.Run = d.Args[2:]
+
+	case "insert":
+		args := d.Args[2:]
+		if len(args) < 2 || len(args) > 3 || (len(args) == 3) == d.HasBlock {
+			return Hook{}, errorf(d.Line, "on %s insert takes a file, a marker and either one line or a block of line directives", h.Event)
+		}
+		file, err := cleanRelPath(args[0])
+		if err != nil {
+			return Hook{}, errorf(d.Line, "on %s insert: %v", h.Event, err)
+		}
+		if strings.TrimSpace(args[1]) == "" {
+			return Hook{}, errorf(d.Line, "on %s insert: the marker cannot be empty", h.Event)
+		}
+		h.File, h.Marker = file, strings.TrimSpace(args[1])
+		if len(args) == 3 {
+			h.Lines = []string{args[2]}
+		}
+		for _, inner := range d.Block {
+			if inner.Name != "line" || inner.HasBlock || len(inner.Args) > 1 {
+				return Hook{}, errorf(inner.Line, `only "line <text>" is allowed inside on %s insert`, h.Event)
+			}
+			text := ""
+			if len(inner.Args) == 1 {
+				text = inner.Args[0]
+			}
+			h.Lines = append(h.Lines, text)
+		}
+		if len(h.Lines) == 0 {
+			return Hook{}, errorf(d.Line, "on %s insert has nothing to insert", h.Event)
+		}
+
+	default:
+		return Hook{}, errorf(d.Line, "%s", usage)
+	}
+	return h, nil
 }
 
 // cleanRelPath accepts only relative, forward-slash paths that stay inside the stack.
