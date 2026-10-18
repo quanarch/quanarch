@@ -41,7 +41,8 @@ This repository contains `quanarch`, the command-line tool (`qu` for short).
 
 Every release also carries `.deb`, `.rpm`, `.apk` and Arch packages and plain
 archives on the [releases page](https://github.com/quanarch/quanarch/releases).
-The install scripts check each download against the release's `checksums.txt`.
+The install scripts check each download against the release's `checksums.txt`;
+the apt repository and the rpm packages are signed with the Relteco package key.
 
 **Debian, Ubuntu**
 
@@ -60,8 +61,8 @@ sudo tee /etc/yum.repos.d/relteco.repo <<'REPO'
 name=Relteco
 baseurl=https://repo.relteco.com/repository/yum-relteco/
 enabled=1
-gpgcheck=0
-repo_gpgcheck=1
+gpgcheck=1
+repo_gpgcheck=0
 gpgkey=https://quanarch.org/relteco.gpg
 REPO
 sudo dnf install quanarch
