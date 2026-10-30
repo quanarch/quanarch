@@ -6,6 +6,9 @@
 //
 // Publishing uses npm's own login: `npm login` on a machine, trusted publishing (OIDC)
 // in GitHub Actions. A version already on npm is skipped, so a release can be published again.
+//
+// With QU_NPM_STAGE=1 the packages are staged (`npm stage publish`, npm 12+) instead:
+// they go live only after a maintainer approves them on npmjs.com with 2FA.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -48,7 +51,8 @@ function release(dir, name) {
     return;
   }
   // The @quanarch/* packages are scoped; npm publishes scoped packages as private unless told otherwise.
-  execFileSync('npm', ['publish', '--registry', registry, '--access', 'public'], { cwd: dir, stdio: 'inherit' });
+  const publish = process.env.QU_NPM_STAGE === '1' ? ['stage', 'publish'] : ['publish'];
+  execFileSync('npm', [...publish, '--registry', registry, '--access', 'public'], { cwd: dir, stdio: 'inherit' });
 }
 
 const platformPackages = {};

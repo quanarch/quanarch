@@ -76,8 +76,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Publish to npm
+      # The trusted publisher on npm may only stage: a release goes live after it is
+      # approved on npmjs.com with 2FA, so this workflow alone cannot publish to npm.
+      - name: Stage the npm packages
+        env:
+          QU_NPM_STAGE: '1'
         run: |
-          # Trusted publishing needs npm 11.5.1 or newer
+          # npm stage needs npm 12
           npm install -g npm@latest
           node npm/publish.mjs "${GITHUB_REF_NAME#v}" dist
