@@ -3,7 +3,7 @@
 `qu`, the command-line tool of [Quanarch](https://quanarch.org), as an npm package.
 
 ```sh
-npm i -g quanarch --registry https://repo.relteco.com/repository/npm-relteco/
+npm i -g quanarch
 qu version
 ```
 

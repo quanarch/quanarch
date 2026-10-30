@@ -1,11 +1,11 @@
-// Publishes qu to an npm registry: one package per platform holding the binary from
-// the release archives, and the quanarch package that picks the right one.
+// Publishes qu to npm: one package per platform holding the binary from the release
+// archives, and the quanarch package that picks the right one.
 //
-//   node npm/publish.mjs <version> <dist dir> <registry>    publish
+//   node npm/publish.mjs <version> <dist dir>               publish
 //   node npm/publish.mjs <version> <dist dir> --pack <dir>  only write the .tgz files
 //
-// Publishing reads NEXUS_USERNAME and NEXUS_PASSWORD. A version already in the
-// registry is skipped, so a release can be published again.
+// Publishing uses npm's own login: `npm login` on a machine, trusted publishing (OIDC)
+// in GitHub Actions. A version already on npm is skipped, so a release can be published again.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -14,9 +14,9 @@ import path from 'node:path';
 
 const [version, dist, ...rest] = process.argv.slice(2);
 const packDir = rest[0] === '--pack' ? path.resolve(rest[1]) : null;
-const registry = packDir ? null : rest[0];
-if (!version || !dist || (!registry && !packDir)) {
-  console.error('usage: node npm/publish.mjs <version> <dist dir> <registry> | --pack <dir>');
+const registry = 'https://registry.npmjs.org/';
+if (!version || !dist || (rest.length && !packDir)) {
+  console.error('usage: node npm/publish.mjs <version> <dist dir> [--pack <dir>]');
   process.exit(2);
 }
 
@@ -31,20 +31,9 @@ const TARGETS = [
 ];
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'quanarch-npm-'));
-const npmrc = path.join(work, '.npmrc');
-
-if (registry) {
-  const { NEXUS_USERNAME: user, NEXUS_PASSWORD: pass } = process.env;
-  if (!user || !pass) {
-    console.error('NEXUS_USERNAME and NEXUS_PASSWORD must be set');
-    process.exit(1);
-  }
-  const auth = Buffer.from(`${user}:${pass}`).toString('base64');
-  fs.writeFileSync(npmrc, `${registry.replace(/^https?:/, '')}:_auth=${auth}\n`);
-}
 
 function published(name) {
-  const r = spawnSync('npm', ['view', `${name}@${version}`, 'version', '--registry', registry, '--userconfig', npmrc], { encoding: 'utf8' });
+  const r = spawnSync('npm', ['view', `${name}@${version}`, 'version', '--registry', registry], { encoding: 'utf8' });
   return r.status === 0 && r.stdout.trim() === version;
 }
 
@@ -58,7 +47,8 @@ function release(dir, name) {
     console.log(`${name}@${version} is already published`);
     return;
   }
-  execFileSync('npm', ['publish', '--registry', registry, '--userconfig', npmrc], { cwd: dir, stdio: 'inherit' });
+  // The @quanarch/* packages are scoped; npm publishes scoped packages as private unless told otherwise.
+  execFileSync('npm', ['publish', '--registry', registry, '--access', 'public'], { cwd: dir, stdio: 'inherit' });
 }
 
 const platformPackages = {};

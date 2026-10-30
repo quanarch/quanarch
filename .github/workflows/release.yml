@@ -6,12 +6,13 @@ on:
 
 permissions:
   contents: write
+  # npm trusted publishing: npm verifies this workflow with a GitHub OIDC token, no npm token is stored
+  id-token: write
 
 env:
   NEXUS_URL: https://repo.relteco.com/repository
   APT_REPO: apt-relteco
   YUM_REPO: yum-relteco
-  NPM_REPO: npm-relteco
 
 jobs:
   release:
@@ -71,17 +72,12 @@ jobs:
               || echo "::warning::could not upload $f to $YUM_REPO"
           done
 
-      # npm i -g quanarch --registry https://repo.relteco.com/repository/npm-relteco/
+      # npm i -g quanarch
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Publish to the npm registry
-        env:
-          NEXUS_USERNAME: ${{ secrets.NEXUS_PUBLISH_USERNAME || vars.NEXUS_PUBLISH_USERNAME }}
-          NEXUS_PASSWORD: ${{ secrets.NEXUS_PUBLISH_PASSWORD || vars.NEXUS_PUBLISH_PASSWORD }}
+      - name: Publish to npm
         run: |
-          if [ -z "$NEXUS_USERNAME" ] || [ -z "$NEXUS_PASSWORD" ]; then
-            echo "::notice::Nexus credentials are not set; skipping npm."
-            exit 0
-          fi
-          node npm/publish.mjs "${GITHUB_REF_NAME#v}" dist "$NEXUS_URL/$NPM_REPO/"
+          # Trusted publishing needs npm 11.5.1 or newer
+          npm install -g npm@latest
+          node npm/publish.mjs "${GITHUB_REF_NAME#v}" dist
